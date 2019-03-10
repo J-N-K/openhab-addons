@@ -29,8 +29,6 @@
 /addons/binding/org.openhab.binding.denonmarantz/ @jwveldhuis
 /addons/binding/org.openhab.binding.digitalstrom/ @MichaelOchel @msiegele
 /addons/binding/org.openhab.binding.dlinksmarthome/ @MikeJMajor
-/addons/binding/org.openhab.binding.dmx/ @J-N-K
-/addons/binding/org.openhab.binding.dmx.test/ @J-N-K
 /addons/binding/org.openhab.binding.dscalarm/ @RSStephens
 /addons/binding/org.openhab.binding.dsmr/ @Hilbrand
 /addons/binding/org.openhab.binding.dsmr.test/ @Hilbrand
@@ -228,7 +226,9 @@
 /addons/voice/org.openhab.voice.voicerss/ @JochenHiller
 /bundles/org.openhab.binding.astro/ @gerrieg
 /bundles/org.openhab.binding.avmfritz/ @cweitkamp
+/bundles/org.openhab.binding.dmx/ @J-N-K
 /itests/org.openhab.binding.astro.tests/ @gerrieg
 /itests/org.openhab.binding.avmfritz.tests/ @cweitkamp
+/itests/org.openhab.binding.dmx.test/ @J-N-K
 
 # PLEASE HELP ADDING FURTHER LINES HERE!
