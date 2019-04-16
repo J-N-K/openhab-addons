@@ -34,7 +34,7 @@ install:
     function mvnp() {
         set -o pipefail # exit build with error when pipes fail
         local command=(mvn $@)
-        exec "${command[@]}"
+        exec "${command[@]}" &
 #		2>&1 | # execute, redirect stderr to stdout
  #           tee .build.log | # write output to log
  #           stdbuf -oL grep -E '^\[INFO\] Building .+ \[.+\]$' | # filter progress
