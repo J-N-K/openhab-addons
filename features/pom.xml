@@ -13,7 +13,7 @@
   <artifactId>org.openhab.addons.reactor.features</artifactId>
   <packaging>pom</packaging>
 
-  <name>openHAB Add-ons :: Features</name>
+  <name>openHAB Add-ons :: Fea tures</name>
 
   <modules>
     <module>karaf</module>
