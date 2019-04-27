@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<thing:thing-descriptions bindingId="fritzboxtr064"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:thing="https://openhab.org/schemas/thing-description/v1.0.0"
+	xsi:schemaLocation="https://openhab.org/schemas/thing-description/v1.0.0 https://openhab.org/schemas/thing-description-1.0.0.xsd">
+
+	<bridge-type id="rootdevice">
+		<label>Fritzbox Root-Device</label>
+		<description>A physical Fritzbox Device.</description>
+
+		<config-description>
+			<parameter name="host" type="text">
+				<label>Host</label>
+				<description>FQDN or IP of FritzBox.</description>
+				<default>fritz.box</default>
+				<context>network-address</context>
+			</parameter>
+			<parameter name="user" type="text" required="true">
+				<label>Username</label>
+			</parameter>
+			<parameter name="password" type="text" required="true">
+				<label>Password</label>
+				<context>password</context>
+			</parameter>
+			<parameter name="refresh" type="integer">
+				<label>Refresh Interval</label>
+				<default>60</default>
+				<unitLabel>s</unitLabel>
+			</parameter>
+			<parameter name="tamIndices" type="text" multiple="true">
+				<label>TAM</label>
+				<description>List of answering machines (starting with 0).</description>
+			</parameter>
+			<parameter name="callDeflectionIndices" type="text" multiple="true">
+				<label>Call Deflection</label>
+				<description>List of call deflection IDs (starting with 0).</description>
+			</parameter>
+			<parameter name="missedCallDays" type="text" multiple="true">
+				<label>Missed Call Days</label>
+				<description>List of days for which missed calls should be calculated.</description>
+			</parameter>
+			<parameter name="rejectedCallDays" type="text" multiple="true">
+				<label>Rejected Call Days</label>
+				<description>List of days for which rejected calls should be calculated.</description>
+			</parameter>
+			<parameter name="inboundCallDays" type="text" multiple="true">
+				<label>Missed Call Days</label>
+				<description>List of days for which inbound calls should be calculated.</description>
+			</parameter>
+			<parameter name="outboundCallDays" type="text" multiple="true">
+				<label>Missed Call Days</label>
+				<description>List of days for which outbound calls should be calculated.</description>
+			</parameter>
+
+		</config-description>
+	</bridge-type>
+
+	<thing-type id="subdevice">
+		<supported-bridge-type-refs>
+			<bridge-type-ref id="rootdevice" />
+		</supported-bridge-type-refs>
+		<label>Fritzbox Sub-Device</label>
+		<description>A virtual Fritzbox Sub-Device.</description>
+
+		<config-description>
+			<parameter name="uuid" type="text" required="true">
+				<label>UUID</label>
+				<description>UUID of the sub-device</description>
+			</parameter>
+			<parameter name="refresh" type="integer">
+				<label>Refresh Interval</label>
+				<default>60</default>
+				<unitLabel>s</unitLabel>
+			</parameter>
+		</config-description>
+	</thing-type>
+
+	<thing-type id="subdeviceLan" listed="false">
+		<supported-bridge-type-refs>
+			<bridge-type-ref id="rootdevice" />
+		</supported-bridge-type-refs>
+		<label>Fritzbox Sub-Device</label>
+		<description>A virtual Fritzbox Sub-Device.</description>
+
+		<config-description>
+			<parameter name="uuid" type="text" required="true">
+				<label>UUID</label>
+				<description>UUID of the sub-device</description>
+			</parameter>
+			<parameter name="refresh" type="integer">
+				<label>Refresh Interval</label>
+				<default>60</default>
+				<unitLabel>s</unitLabel>
+			</parameter>
+			<parameter name="macOnline" type="text" multiple="true">
+				<label>MAC Online</label>
+				<description>List of MACs for "online" status detection (format: 11:11:11:11:11:11).</description>
+			</parameter>
+		</config-description>
+	</thing-type>
+
+</thing:thing-descriptions>
