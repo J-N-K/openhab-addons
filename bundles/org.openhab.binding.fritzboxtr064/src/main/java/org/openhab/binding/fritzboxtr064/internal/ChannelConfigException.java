@@ -16,7 +16,7 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 
 /**
  *
- * The{@link ChannelConfigException} is a catched Exception
+ * The{@link ChannelConfigException} is a catched Exception that is thrown during channel configuration
  *
  * @author Jan N. Klug - Initial contribution
  */

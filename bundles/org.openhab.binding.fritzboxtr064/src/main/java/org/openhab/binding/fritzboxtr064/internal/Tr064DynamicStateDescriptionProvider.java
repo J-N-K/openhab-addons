@@ -44,10 +44,8 @@ public class Tr064DynamicStateDescriptionProvider implements DynamicStateDescrip
      * Set a state description for a channel. This description will be used when preparing the channel state by
      * the framework for presentation. A previous description, if existed, will be replaced.
      *
-     * @param channelUID
-     *            channel UID
-     * @param description
-     *            state description for the channel
+     * @param channelUID channel UID
+     * @param description state description for the channel
      */
     public void setDescription(ChannelUID channelUID, StateDescription description) {
         logger.trace("adding state description for channel {}", channelUID);

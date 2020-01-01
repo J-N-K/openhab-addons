@@ -34,14 +34,14 @@ import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
 
 /**
- * The {@link FritzboxTr064HandlerFactory} is responsible for creating things and thing
+ * The {@link Tr064HandlerFactory} is responsible for creating things and thing
  * handlers.
  *
  * @author Jan N. Klug - Initial contribution
  */
 @NonNullByDefault
 @Component(immediate = true, service = { ThingHandlerFactory.class }, configurationPid = "binding.fritzboxtr064")
-public class FritzboxTr064HandlerFactory extends BaseThingHandlerFactory {
+public class Tr064HandlerFactory extends BaseThingHandlerFactory {
     private static final Set<ThingTypeUID> SUPPORTED_THING_TYPES_UIDS = Stream
             .concat(Tr064RootHandler.SUPPORTED_THING_TYPES.stream(), Tr064SubHandler.SUPPORTED_THING_TYPES.stream())
             .collect(Collectors.toSet());
@@ -51,7 +51,7 @@ public class FritzboxTr064HandlerFactory extends BaseThingHandlerFactory {
     private final Map<ThingUID, ServiceRegistration<?>> discoveryServiceRegs = new HashMap<>();
 
     @Activate
-    public FritzboxTr064HandlerFactory(@Reference HttpClientFactory httpClientFactory,
+    public Tr064HandlerFactory(@Reference HttpClientFactory httpClientFactory,
             @Reference Tr064DynamicStateDescriptionProvider dynamicStateDescriptionProvider) {
         httpClient = httpClientFactory.getCommonHttpClient();
         this.dynamicStateDescriptionProvider = dynamicStateDescriptionProvider;
@@ -88,8 +88,13 @@ public class FritzboxTr064HandlerFactory extends BaseThingHandlerFactory {
         }
     }
 
+    /**
+     * create and register a new discovery service for the given bridge handler
+     *
+     * @param bridgeHandler the bridgehandler (root device)
+     */
     private synchronized void registerDeviceDiscoveryService(Tr064RootHandler bridgeHandler) {
-        FritzboxTr064DiscoveryService discoveryService = new FritzboxTr064DiscoveryService(bridgeHandler);
+        Tr064DiscoveryService discoveryService = new Tr064DiscoveryService(bridgeHandler);
         discoveryServiceRegs.put(bridgeHandler.getThing().getUID(), bundleContext
                 .registerService(DiscoveryService.class.getName(), discoveryService, new Hashtable<String, Object>()));
     }

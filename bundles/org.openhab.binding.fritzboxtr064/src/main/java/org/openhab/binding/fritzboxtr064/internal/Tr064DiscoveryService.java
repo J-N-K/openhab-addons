@@ -12,8 +12,8 @@
  */
 package org.openhab.binding.fritzboxtr064.internal;
 
-import static org.openhab.binding.fritzboxtr064.internal.FritzboxTr064BindingConstants.THING_TYPE_SUBDEVICE;
-import static org.openhab.binding.fritzboxtr064.internal.FritzboxTr064BindingConstants.THING_TYPE_SUBDEVICE_LAN;
+import static org.openhab.binding.fritzboxtr064.internal.Tr064BindingConstants.THING_TYPE_SUBDEVICE;
+import static org.openhab.binding.fritzboxtr064.internal.Tr064BindingConstants.THING_TYPE_SUBDEVICE_LAN;
 
 import java.util.*;
 
@@ -29,21 +29,20 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * The {@link FritzboxTr064DiscoveryService} discovers sub devices of a fritzbox device.
+ * The {@link Tr064DiscoveryService} discovers sub devices of a root device.
  *
  * @author Jan N. Klug - Initial contribution
  */
 @NonNullByDefault
-public class FritzboxTr064DiscoveryService extends AbstractDiscoveryService {
+public class Tr064DiscoveryService extends AbstractDiscoveryService {
+    private static final int SEARCH_TIME = 5;
     public static final Set<ThingTypeUID> SUPPORTED_THING_TYPES = Collections.singleton(THING_TYPE_SUBDEVICE);
 
-    private final Logger logger = LoggerFactory.getLogger(FritzboxTr064DiscoveryService.class);
-
-    private static final int SEARCH_TIME = 10;
+    private final Logger logger = LoggerFactory.getLogger(Tr064DiscoveryService.class);
 
     private final Tr064RootHandler bridgeHandler;
 
-    public FritzboxTr064DiscoveryService(Tr064RootHandler bridgeHandler) {
+    public Tr064DiscoveryService(Tr064RootHandler bridgeHandler) {
         super(SEARCH_TIME);
         this.bridgeHandler = bridgeHandler;
     }
@@ -79,6 +78,7 @@ public class FritzboxTr064DiscoveryService extends AbstractDiscoveryService {
                 Map<String, Object> properties = new HashMap<>(2);
                 properties.put("uuid", udn);
                 properties.put("deviceType", device.getDeviceType());
+
                 DiscoveryResult result = DiscoveryResultBuilder.create(thingUID).withLabel(device.getFriendlyName())
                         .withBridge(bridgeHandler.getThing().getUID()).withProperties(properties).build();
                 thingDiscovered(result);

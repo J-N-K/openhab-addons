@@ -12,8 +12,8 @@
  */
 package org.openhab.binding.fritzboxtr064.internal.util;
 
-import static org.openhab.binding.fritzboxtr064.internal.FritzboxTr064BindingConstants.CHANNEL_TYPES;
-import static org.openhab.binding.fritzboxtr064.internal.FritzboxTr064BindingConstants.THING_TYPE_ROOTDEVICE;
+import static org.openhab.binding.fritzboxtr064.internal.Tr064BindingConstants.CHANNEL_TYPES;
+import static org.openhab.binding.fritzboxtr064.internal.Tr064BindingConstants.THING_TYPE_ROOTDEVICE;
 
 import java.io.InputStream;
 import java.lang.reflect.Field;
