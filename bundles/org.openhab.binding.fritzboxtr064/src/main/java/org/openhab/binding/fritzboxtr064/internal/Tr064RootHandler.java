@@ -102,6 +102,7 @@ public class Tr064RootHandler extends BaseBridgeHandler {
             if (state != null) {
                 updateState(channelUID, state);
             }
+            return;
         }
 
         if (channelConfig.getChannelType().getSetAction() == null) {
