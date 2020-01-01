@@ -12,7 +12,7 @@
  */
 package org.openhab.binding.fritzboxtr064.internal;
 
-import static org.openhab.binding.fritzboxtr064.internal.FritzboxTr064BindingConstants.THING_TYPE_ROOTDEVICE;
+import static org.openhab.binding.fritzboxtr064.internal.Tr064BindingConstants.THING_TYPE_ROOTDEVICE;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -49,7 +49,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * The {@link Tr064RootHandler} is responsible for handling commands, which are
- * sent to one of the channels.
+ * sent to one of the channels and update channel values
  *
  * @author Jan N. Klug - Initial contribution
  */
@@ -97,7 +97,8 @@ public class Tr064RootHandler extends BaseBridgeHandler {
         }
 
         if (command instanceof RefreshType) {
-            State state = stateCache.putIfAbsentAndGet(channelUID, () -> getChannelStateFromDevice(channelConfig));
+            State state = stateCache.putIfAbsentAndGet(channelUID,
+                    () -> soapConnector.getChannelStateFromDevice(channelConfig, channels, stateCache));
             if (state != null) {
                 updateState(channelUID, state);
             }
@@ -107,7 +108,7 @@ public class Tr064RootHandler extends BaseBridgeHandler {
             logger.debug("Discarding command {} to {}, read-only channel", command, channelUID);
             return;
         }
-        scheduler.execute(() -> sendChannelCommandToDevice(channelConfig, command));
+        scheduler.execute(() -> soapConnector.sendChannelCommandToDevice(channelConfig, command));
     }
 
     @Override
@@ -115,15 +116,19 @@ public class Tr064RootHandler extends BaseBridgeHandler {
         config = getConfigAs(Tr064RootConfiguration.class);
         if (!config.isValid()) {
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR,
-                    "One or more mandatory configuration field is empty");
+                    "At least one mandatory configuration field is empty");
             return;
         }
 
         endpointBaseURL = "http://" + config.host + ":49000";
         updateStatus(ThingStatus.UNKNOWN);
+
         connectFuture = scheduler.scheduleWithFixedDelay(this::internalInitialize, 0, RETRY_INTERVAL, TimeUnit.SECONDS);
     }
 
+    /**
+     * internal thing initializer (sets SCPDUtil and connects to remote device)
+     */
     private void internalInitialize() {
         try {
             scpdUtil = new SCPDUtil(httpClient, endpointBaseURL);
@@ -132,13 +137,24 @@ public class Tr064RootHandler extends BaseBridgeHandler {
                     "could not get device definitions from " + config.host);
             return;
         }
+
         if (establishSecureConnectionAndUpdateProperties()) {
             final ScheduledFuture<?> connectFuture = this.connectFuture;
             if (connectFuture != null) {
                 connectFuture.cancel(false);
                 this.connectFuture = null;
             }
-            configureChannels();
+
+            // connection successful, check channels
+            ThingBuilder thingBuilder = editThing();
+            thingBuilder.withoutChannels(thing.getChannels());
+            final SCPDUtil scpdUtil = this.scpdUtil;
+            if (scpdUtil != null) {
+                Util.checkAvailableChannels(thing, thingBuilder, scpdUtil, "", deviceType, channels,
+                        dynamicStateDescriptionProvider);
+                updateThing(thingBuilder.build());
+            }
+
             installPolling();
             updateStatus(ThingStatus.ONLINE, ThingStatusDetail.NONE);
         }
@@ -159,34 +175,24 @@ public class Tr064RootHandler extends BaseBridgeHandler {
         super.dispose();
     }
 
+    /**
+     * poll remote device for channel values
+     */
     private void poll() {
         channels.forEach((channelUID, channelConfig) -> {
-            State state = stateCache.putIfAbsentAndGet(channelUID, () -> getChannelStateFromDevice(channelConfig));
+            State state = stateCache.putIfAbsentAndGet(channelUID,
+                    () -> soapConnector.getChannelStateFromDevice(channelConfig, channels, stateCache));
             if (state != null) {
                 updateState(channelUID, state);
             }
         });
     }
 
-    private void sendChannelCommandToDevice(Tr064ChannelConfig channelConfig, Command command) {
-        soapConnector.sendChannelCommandToDevice(channelConfig, command);
-    }
-
-    private State getChannelStateFromDevice(Tr064ChannelConfig channelConfig) {
-        return soapConnector.getChannelStateFromDevice(channelConfig, channels, stateCache);
-    }
-
-    private void configureChannels() {
-        ThingBuilder thingBuilder = editThing();
-        thingBuilder.withoutChannels(thing.getChannels());
-        final SCPDUtil scpdUtil = this.scpdUtil;
-        if (scpdUtil != null) {
-            Util.checkAvailableChannels(thing, thingBuilder, scpdUtil, "", deviceType, channels,
-                    dynamicStateDescriptionProvider);
-            updateThing(thingBuilder.build());
-        }
-    }
-
+    /**
+     * establish the connection - get secure port (if avallable), install authentication, get device properties
+     *
+     * @return true if successful
+     */
     private boolean establishSecureConnectionAndUpdateProperties() {
         final SCPDUtil scpdUtil = this.scpdUtil;
         if (scpdUtil != null) {
@@ -201,15 +207,16 @@ public class Tr064RootHandler extends BaseBridgeHandler {
                 this.deviceType = device.getDeviceType();
 
                 // try to get security (https) port
-                SOAPMessage soapResponse = soapConnector.sendSyncSOAPRequest(deviceService, "GetSecurityPort",
-                        Collections.emptyMap(), 1000);
+                SOAPMessage soapResponse = soapConnector.doSOAPRequest(deviceService, "GetSecurityPort",
+                        Collections.emptyMap());
                 if (!soapResponse.getSOAPBody().hasFault()) {
-                    SOAPValueParser soapValueParser = new SOAPValueParser(httpClient);
-                    soapValueParser.getStateFromSOAPValue(soapResponse, "NewSecurityPort").ifPresentOrElse(port -> {
-                        endpointBaseURL = "https://" + config.host + ":" + port.toString();
-                        soapConnector = new SOAPConnector(httpClient, endpointBaseURL);
-                        logger.debug("endpointBaseURL is now '{}'", endpointBaseURL);
-                    }, () -> logger.warn("Could not determine secure port, disabling https"));
+                    SOAPValueConverter soapValueConverter = new SOAPValueConverter(httpClient);
+                    soapValueConverter.getStateFromSOAPValue(soapResponse, "NewSecurityPort", null)
+                            .ifPresentOrElse(port -> {
+                                endpointBaseURL = "https://" + config.host + ":" + port.toString();
+                                soapConnector = new SOAPConnector(httpClient, endpointBaseURL);
+                                logger.debug("endpointBaseURL is now '{}'", endpointBaseURL);
+                            }, () -> logger.warn("Could not determine secure port, disabling https"));
                 } else {
                     logger.warn("Could not determine secure port, disabling https");
                 }
@@ -226,15 +233,15 @@ public class Tr064RootHandler extends BaseBridgeHandler {
                                 "Could not get service definition for 'urn:DeviceInfo-com:serviceId:DeviceInfo1'"))
                         .getActionList().stream().filter(action -> action.getName().equals("GetInfo")).findFirst()
                         .orElseThrow(() -> new SCPDException("Action 'GetInfo' not found"));
-                SOAPMessage soapResponse1 = soapConnector.sendSyncSOAPRequest(deviceService, getInfoAction.getName(),
-                        Collections.emptyMap(), 5000);
-                SOAPValueParser soapValueParser = new SOAPValueParser(httpClient);
+                SOAPMessage soapResponse1 = soapConnector.doSOAPRequest(deviceService, getInfoAction.getName(),
+                        Collections.emptyMap());
+                SOAPValueConverter soapValueConverter = new SOAPValueConverter(httpClient);
                 Map<String, String> properties = editProperties();
                 PROPERTY_ARGUMENTS.forEach(argumentName -> getInfoAction.getArgumentList().stream()
                         .filter(argument -> argument.getName().equals(argumentName)).findFirst()
-                        .ifPresent(argument -> soapValueParser.getStateFromSOAPValue(soapResponse1, argumentName)
-                                .ifPresent(value -> properties.put(argument.getRelatedStateVariable(),
-                                        value.toString()))));
+                        .ifPresent(argument -> soapValueConverter
+                                .getStateFromSOAPValue(soapResponse1, argumentName, null).ifPresent(value -> properties
+                                        .put(argument.getRelatedStateVariable(), value.toString()))));
                 properties.put("deviceType", device.getDeviceType());
                 updateProperties(properties);
 
@@ -247,15 +254,30 @@ public class Tr064RootHandler extends BaseBridgeHandler {
         return false;
     }
 
+    /**
+     * get all sub devices of this root device (used for discovery)
+     *
+     * @return the list
+     */
     public List<SCPDDeviceType> getAllSubDevices() {
         final SCPDUtil scpdUtil = this.scpdUtil;
         return (scpdUtil == null) ? Collections.emptyList() : scpdUtil.getAllSubDevices();
     }
 
-    public SOAPConnector getSOAPUtil() {
+    /**
+     * get the SOAP connector (used by sub devices for communication with the remote device)
+     *
+     * @return the SOAP connector
+     */
+    public SOAPConnector getSOAPConnector() {
         return soapConnector;
     }
 
+    /**
+     * get the SCPD processing utility
+     *
+     * @return the SCPD utility (or null if not available)
+     */
     public @Nullable SCPDUtil getSCPDUtil() {
         return scpdUtil;
     }
@@ -274,6 +296,9 @@ public class Tr064RootHandler extends BaseBridgeHandler {
         logger.debug("Channel {} unlinked", channelUID);
     }
 
+    /**
+     * uninstall the polling
+     */
     private void uninstallPolling() {
         final ScheduledFuture<?> pollFuture = this.pollFuture;
         if (pollFuture != null) {
@@ -282,6 +307,9 @@ public class Tr064RootHandler extends BaseBridgeHandler {
         }
     }
 
+    /**
+     * install the polling
+     */
     private void installPolling() {
         uninstallPolling();
         pollFuture = scheduler.scheduleWithFixedDelay(this::poll, 0, config.refresh, TimeUnit.SECONDS);

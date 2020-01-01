@@ -12,8 +12,8 @@
  */
 package org.openhab.binding.fritzboxtr064.internal;
 
-import static org.openhab.binding.fritzboxtr064.internal.FritzboxTr064BindingConstants.THING_TYPE_SUBDEVICE;
-import static org.openhab.binding.fritzboxtr064.internal.FritzboxTr064BindingConstants.THING_TYPE_SUBDEVICE_LAN;
+import static org.openhab.binding.fritzboxtr064.internal.Tr064BindingConstants.THING_TYPE_SUBDEVICE;
+import static org.openhab.binding.fritzboxtr064.internal.Tr064BindingConstants.THING_TYPE_SUBDEVICE_LAN;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -63,6 +63,7 @@ public class Tr064SubHandler extends BaseThingHandler {
     // caching is used to prevent excessive calls to the same action
     private final ExpiringCacheMap<ChannelUID, State> stateCache = new ExpiringCacheMap<>(2000);
 
+    private @Nullable SOAPConnector soapConnector;
     private @Nullable ScheduledFuture<?> connectFuture;
     private @Nullable ScheduledFuture<?> pollFuture;
 
@@ -80,7 +81,8 @@ public class Tr064SubHandler extends BaseThingHandler {
         }
 
         if (command instanceof RefreshType) {
-            State state = stateCache.putIfAbsentAndGet(channelUID, () -> getChannelStateFromDevice(channelConfig));
+            State state = stateCache.putIfAbsentAndGet(channelUID, () -> soapConnector == null ? UnDefType.UNDEF
+                    : soapConnector.getChannelStateFromDevice(channelConfig, channels, stateCache));
             if (state != null) {
                 updateState(channelUID, state);
             }
@@ -90,27 +92,13 @@ public class Tr064SubHandler extends BaseThingHandler {
             logger.debug("Discarding command {} to {}, read-only channel", command, channelUID);
             return;
         }
-        scheduler.execute(() -> sendChannelCommandToDevice(channelConfig, command));
-    }
-
-    private void sendChannelCommandToDevice(Tr064ChannelConfig channelConfig, Command command) {
-        final Tr064RootHandler bridgeHandler = getBridgeHandler();
-        if (bridgeHandler == null) {
-            logger.warn("Bridge-handler is null in thing {}", thing.getUID());
-            return;
-        }
-        SOAPConnector soapConnector = bridgeHandler.getSOAPUtil();
-        soapConnector.sendChannelCommandToDevice(channelConfig, command);
-    }
-
-    private State getChannelStateFromDevice(Tr064ChannelConfig channelConfig) {
-        final Tr064RootHandler bridgeHandler = getBridgeHandler();
-        if (bridgeHandler == null) {
-            logger.warn("Bridge-handler is null in thing {}", thing.getUID());
-            return UnDefType.UNDEF;
-        }
-        SOAPConnector soapConnector = bridgeHandler.getSOAPUtil();
-        return soapConnector.getChannelStateFromDevice(channelConfig, channels, stateCache);
+        scheduler.execute(() -> {
+            if (soapConnector == null) {
+                logger.warn("Could not send command because connector not available");
+            } else {
+                soapConnector.sendChannelCommandToDevice(channelConfig, command);
+            }
+        });
     }
 
     @Override
@@ -132,22 +120,42 @@ public class Tr064SubHandler extends BaseThingHandler {
     }
 
     private void internalInitialize() {
-        final ScheduledFuture<?> connectFuture = this.connectFuture;
-        if (connectFuture != null) {
-            connectFuture.cancel(false);
-            this.connectFuture = null;
+        final Bridge bridge = getBridge();
+        if (bridge == null) {
+            return;
         }
-        if (!checkProperties()) {
-            this.connectFuture = scheduler.scheduleWithFixedDelay(this::internalInitialize, 0, RETRY_INTERVAL,
-                    TimeUnit.SECONDS);
+        final Tr064RootHandler bridgeHandler = (Tr064RootHandler) bridge.getHandler();
+        if (bridgeHandler == null) {
+            logger.warn("Bridge-handler is null in thing {}", thing.getUID());
+            return;
         }
-        if (!configureChannels()) {
-            this.connectFuture = scheduler.scheduleWithFixedDelay(this::internalInitialize, 0, RETRY_INTERVAL,
-                    TimeUnit.SECONDS);
+        final SCPDUtil scpdUtil = bridgeHandler.getSCPDUtil();
+        if (scpdUtil == null) {
+            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR,
+                    "Could not get device definitions");
+            return;
         }
-        isInitialized = true;
-        installPolling();
-        updateStatus(ThingStatus.ONLINE, ThingStatusDetail.NONE);
+
+        if (checkProperties(scpdUtil)) {
+            // properties set, check channels
+            ThingBuilder thingBuilder = editThing();
+            thingBuilder.withoutChannels(thing.getChannels());
+            Util.checkAvailableChannels(thing, thingBuilder, scpdUtil, config.uuid, deviceType, channels,
+                    dynamicStateDescriptionProvider);
+            updateThing(thingBuilder.build());
+
+            // remove connect scheduler
+            final ScheduledFuture<?> connectFuture = this.connectFuture;
+            if (connectFuture != null) {
+                connectFuture.cancel(false);
+                this.connectFuture = null;
+            }
+
+            isInitialized = true;
+            soapConnector = bridgeHandler.getSOAPConnector();
+            installPolling();
+            updateStatus(ThingStatus.ONLINE, ThingStatusDetail.NONE);
+        }
     }
 
     @Override
@@ -166,38 +174,27 @@ public class Tr064SubHandler extends BaseThingHandler {
         super.dispose();
     }
 
+    /**
+     * poll remote device for channel values
+     */
     private void poll() {
         channels.forEach((channelUID, channelConfig) -> {
-            State state = stateCache.putIfAbsentAndGet(channelUID, () -> getChannelStateFromDevice(channelConfig));
+            State state = stateCache.putIfAbsentAndGet(channelUID, () -> soapConnector == null ? UnDefType.UNDEF
+                    : soapConnector.getChannelStateFromDevice(channelConfig, channels, stateCache));
             if (state != null) {
                 updateState(channelUID, state);
             }
         });
     }
 
-    private boolean configureChannels() {
-        ThingBuilder thingBuilder = editThing();
-        thingBuilder.withoutChannels(thing.getChannels());
-        final SCPDUtil scpdUtil = getSCPDUtil();
-        if (scpdUtil == null) {
-            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR,
-                    "Could not get device definitions");
-            return false;
-        }
-        Util.checkAvailableChannels(thing, thingBuilder, scpdUtil, config.uuid, deviceType, channels,
-                dynamicStateDescriptionProvider);
-        updateThing(thingBuilder.build());
-        return true;
-    }
-
-    private boolean checkProperties() {
+    /**
+     * get device properties from remote device
+     *
+     * @param scpdUtil the SCPD util of this device
+     * @return true if successfull
+     */
+    private boolean checkProperties(SCPDUtil scpdUtil) {
         try {
-            final SCPDUtil scpdUtil = getSCPDUtil();
-            if (scpdUtil == null) {
-                updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR,
-                        "Could not get device definitions");
-                return false;
-            }
             SCPDDeviceType device = scpdUtil.getDevice(config.uuid)
                     .orElseThrow(() -> new SCPDException("Could not find device " + config.uuid));
             String deviceType = device.getDeviceType();
@@ -217,16 +214,6 @@ public class Tr064SubHandler extends BaseThingHandler {
 
             return false;
         }
-    }
-
-    private @Nullable Tr064RootHandler getBridgeHandler() {
-        final Bridge bridge = getBridge();
-        return (bridge == null) ? null : (Tr064RootHandler) bridge.getHandler();
-    }
-
-    private @Nullable SCPDUtil getSCPDUtil() {
-        final Tr064RootHandler bridgeHandler = getBridgeHandler();
-        return (bridgeHandler == null) ? null : bridgeHandler.getSCPDUtil();
     }
 
     @Override
@@ -249,6 +236,9 @@ public class Tr064SubHandler extends BaseThingHandler {
         }
     }
 
+    /**
+     * uninstall update polling
+     */
     private void uninstallPolling() {
         final ScheduledFuture<?> pollFuture = this.pollFuture;
         if (pollFuture != null) {
@@ -257,6 +247,9 @@ public class Tr064SubHandler extends BaseThingHandler {
         }
     }
 
+    /**
+     * install update polling
+     */
     private void installPolling() {
         uninstallPolling();
         pollFuture = scheduler.scheduleWithFixedDelay(this::poll, 0, config.refresh, TimeUnit.SECONDS);

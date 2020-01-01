@@ -16,15 +16,16 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 
 /**
  *
- * The{@link SCPDException} is a catched Exception that is thrown in case of errors during SCPD processing
+ * The{@link PostProcessingException} is a catched Exception that is thrown in case of conversion errors during post
+ * processing
  *
  * @author Jan N. Klug - Initial contribution
  */
 @NonNullByDefault
-public class SCPDException extends Exception {
+public class PostProcessingException extends Exception {
     private static final long serialVersionUID = 1L;
 
-    public SCPDException(String message) {
+    public PostProcessingException(String message) {
         super(message);
     }
 }

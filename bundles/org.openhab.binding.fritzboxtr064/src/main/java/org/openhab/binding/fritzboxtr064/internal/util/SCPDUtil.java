@@ -27,6 +27,7 @@ import javax.xml.bind.Unmarshaller;
 import javax.xml.transform.stream.StreamSource;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.client.api.ContentResponse;
 import org.eclipse.jetty.http.HttpMethod;
@@ -57,47 +58,74 @@ public class SCPDUtil {
     public SCPDUtil(HttpClient httpClient, String endpoint) throws SCPDException {
         this.httpClient = httpClient;
 
-        scpdRoot = getAndUnmarshalSCPD(endpoint + "/tr64desc.xml", SCPDRootType.class)
-                .orElseThrow(() -> new SCPDException("could not get SCPD root"));
+        SCPDRootType scpdRoot = getAndUnmarshalSCPD(endpoint + "/tr64desc.xml", SCPDRootType.class);
+        if (scpdRoot == null) {
+            throw new SCPDException("could not get SCPD root");
+        }
+        this.scpdRoot = scpdRoot;
+
         scpdDevicesList.addAll(flatDeviceList(scpdRoot.getDevice()).collect(Collectors.toList()));
         for (SCPDDeviceType device : scpdDevicesList) {
             for (SCPDServiceType service : device.getServiceList()) {
-                String serviceId = service.getServiceId();
-                if (!serviceMap.containsKey(serviceId)) {
-                    SCPDScpdType scpdService = getAndUnmarshalSCPD(endpoint + service.getSCPDURL(), SCPDScpdType.class)
-                            .orElseThrow(() -> new SCPDException("could not get SCPD root"));
-                    serviceMap.put(serviceId, scpdService);
+                SCPDScpdType scpd = serviceMap.computeIfAbsent(service.getServiceId(),
+                        serviceId -> getAndUnmarshalSCPD(endpoint + service.getSCPDURL(), SCPDScpdType.class));
+                if (scpd == null) {
+                    throw new SCPDException("could not get SCPD service");
                 }
             }
         }
     }
 
-    private <T> Optional<T> getAndUnmarshalSCPD(String uri, Class<T> clazz) {
+    /**
+     * generic unmarshaller
+     *
+     * @param uri the uri of the XML file
+     * @param clazz the class describing the XML file
+     * @return unmarshalling result
+     */
+    private <T> @Nullable T getAndUnmarshalSCPD(String uri, Class<T> clazz) {
         try {
-            ContentResponse contentResponse = httpClient.newRequest(uri).timeout(5, TimeUnit.SECONDS)
+            ContentResponse contentResponse = httpClient.newRequest(uri).timeout(2, TimeUnit.SECONDS)
                     .method(HttpMethod.GET).send();
             InputStream xml = new ByteArrayInputStream(contentResponse.getContent());
 
             JAXBContext context = JAXBContext.newInstance(clazz);
             Unmarshaller um = context.createUnmarshaller();
-            return Optional.ofNullable(um.unmarshal(new StreamSource(xml), clazz).getValue());
+            return um.unmarshal(new StreamSource(xml), clazz).getValue();
         } catch (ExecutionException | InterruptedException | TimeoutException e) {
             logger.debug("HTTP Failed to GET uri '{}': {}", uri, e.getMessage());
         } catch (JAXBException e) {
             logger.debug("Unmarshalling failed: {}", e.getMessage());
         }
-        return Optional.empty();
+        return null;
     }
 
+    /**
+     * recursively flatten the device tree to a stream
+     *
+     * @param device a device
+     * @return stream of sub-devices
+     */
     private Stream<SCPDDeviceType> flatDeviceList(SCPDDeviceType device) {
         return Stream.concat(Stream.of(device), device.getDeviceList().stream().flatMap(this::flatDeviceList));
     }
 
+    /**
+     * get a list of all sub-devices (root device not included)
+     *
+     * @return the device list
+     */
     public List<SCPDDeviceType> getAllSubDevices() {
         return scpdDevicesList.stream().filter(device -> !device.getUDN().equals(scpdRoot.getDevice().getUDN()))
                 .collect(Collectors.toList());
     }
 
+    /**
+     * get a single device by it's UDN
+     *
+     * @param udn the device UDN
+     * @return the device
+     */
     public Optional<SCPDDeviceType> getDevice(String udn) {
         if (udn.isEmpty()) {
             return Optional.of(scpdRoot.getDevice());
@@ -106,7 +134,12 @@ public class SCPDUtil {
         }
     }
 
-    // SCPD service files
+    /**
+     * get a single service by it's srrviceId
+     *
+     * @param serviceId the service id
+     * @return the service
+     */
     public Optional<SCPDScpdType> getService(String serviceId) {
         return Optional.ofNullable(serviceMap.get(serviceId));
     }

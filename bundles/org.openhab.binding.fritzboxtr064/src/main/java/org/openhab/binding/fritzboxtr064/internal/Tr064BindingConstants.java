@@ -21,13 +21,13 @@ import org.openhab.binding.fritzboxtr064.internal.model.config.ChannelType;
 import org.openhab.binding.fritzboxtr064.internal.util.Util;
 
 /**
- * The {@link FritzboxTr064BindingConstants} class defines common constants, which are
+ * The {@link Tr064BindingConstants} class defines common constants, which are
  * used across the whole binding.
  *
  * @author Jan N. Klug - Initial contribution
  */
 @NonNullByDefault
-public class FritzboxTr064BindingConstants {
+public class Tr064BindingConstants {
     private static final String BINDING_ID = "fritzboxtr064";
 
     public static final ThingTypeUID THING_TYPE_ROOTDEVICE = new ThingTypeUID(BINDING_ID, "rootdevice");

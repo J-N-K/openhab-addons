@@ -26,19 +26,19 @@ import org.openhab.binding.fritzboxtr064.internal.model.scpd.service.SCPDActionT
 @NonNullByDefault
 public class Tr064ChannelConfig {
     private ChannelType channelType;
-    private SCPDServiceType deviceService;
+    private SCPDServiceType service;
     private @Nullable SCPDActionType getAction;
     private String dataType = "";
     private @Nullable String parameter;
 
-    public Tr064ChannelConfig(ChannelType channelType, SCPDServiceType deviceService) {
+    public Tr064ChannelConfig(ChannelType channelType, SCPDServiceType service) {
         this.channelType = channelType;
-        this.deviceService = deviceService;
+        this.service = service;
     }
 
     public Tr064ChannelConfig(Tr064ChannelConfig o) {
         this.channelType = o.channelType;
-        this.deviceService = o.deviceService;
+        this.service = o.service;
         this.getAction = o.getAction;
         this.dataType = o.dataType;
         this.parameter = o.parameter;
@@ -48,8 +48,8 @@ public class Tr064ChannelConfig {
         return channelType;
     }
 
-    public SCPDServiceType getDeviceService() {
-        return deviceService;
+    public SCPDServiceType getService() {
+        return service;
     }
 
     public String getDataType() {
