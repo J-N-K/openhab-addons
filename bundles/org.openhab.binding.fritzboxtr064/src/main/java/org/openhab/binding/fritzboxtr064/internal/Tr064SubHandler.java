@@ -86,6 +86,7 @@ public class Tr064SubHandler extends BaseThingHandler {
             if (state != null) {
                 updateState(channelUID, state);
             }
+            return;
         }
 
         if (channelConfig.getChannelType().getSetAction() == null) {
