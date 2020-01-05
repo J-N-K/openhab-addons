@@ -12,6 +12,7 @@
  */
 package org.openhab.binding.fritzboxtr064.internal;
 
+import static org.openhab.binding.fritzboxtr064.internal.util.Util.getSOAPElement;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -45,7 +46,6 @@ import org.openhab.binding.fritzboxtr064.internal.model.scpd.root.SCPDServiceTyp
 import org.openhab.binding.fritzboxtr064.internal.model.scpd.service.SCPDActionType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.w3c.dom.NodeList;
 
 /**
  * The {@link SOAPConnector} provides communication with a remote SOAP device
@@ -90,8 +90,7 @@ public class SOAPConnector {
         SOAPElement soapBodyElem = soapBody.addChildElement(soapAction, "u", service.getServiceType());
         arguments.entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(argument -> {
             try {
-                SOAPElement argumentElement = soapBodyElem.addChildElement(argument.getKey());
-                argumentElement.setTextContent(argument.getValue());
+                soapBodyElem.addChildElement(argument.getKey()).setTextContent(argument.getValue());
             } catch (SOAPException e) {
                 logger.warn("Could not add {}:{} to SOAP Request: {}", argument.getKey(), argument.getValue(),
                         e.getMessage());
@@ -146,16 +145,8 @@ public class SOAPConnector {
 
                 SOAPMessage soapMessage = MessageFactory.newInstance().createMessage(null, is);
                 if (soapMessage.getSOAPBody().hasFault()) {
-                    String soapError = "unknown";
-                    String soapReason = "unknown";
-                    NodeList nodeList = soapMessage.getSOAPBody().getElementsByTagName("errorCode");
-                    if (nodeList != null && nodeList.getLength() > 0) {
-                        soapError = nodeList.item(0).getTextContent();
-                    }
-                    nodeList = soapMessage.getSOAPBody().getElementsByTagName("errorDescription");
-                    if (nodeList != null && nodeList.getLength() > 0) {
-                        soapReason = nodeList.item(0).getTextContent();
-                    }
+                    String soapError = getSOAPElement(soapMessage, "errorCode").orElse("unknown");
+                    String soapReason = getSOAPElement(soapMessage, "errorDescription").orElse("unknown");
                     String error = String.format("HTTP-Response-Code %d (%s), SOAP-Fault: %s (%s)",
                             response.getStatus(), response.getReason(), soapError, soapReason);
                     throw new Tr064CommunicationException(error);
