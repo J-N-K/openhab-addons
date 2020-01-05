@@ -18,6 +18,7 @@ import static org.openhab.binding.fritzboxtr064.internal.Tr064BindingConstants.T
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -62,6 +63,7 @@ public class Tr064SubHandler extends BaseThingHandler {
     private final Map<ChannelUID, Tr064ChannelConfig> channels = new HashMap<>();
     // caching is used to prevent excessive calls to the same action
     private final ExpiringCacheMap<ChannelUID, State> stateCache = new ExpiringCacheMap<>(2000);
+    private final Set<ChannelUID> linkedChannels = ConcurrentHashMap.newKeySet();
 
     private @Nullable SOAPConnector soapConnector;
     private @Nullable ScheduledFuture<?> connectFuture;
@@ -180,10 +182,12 @@ public class Tr064SubHandler extends BaseThingHandler {
      */
     private void poll() {
         channels.forEach((channelUID, channelConfig) -> {
-            State state = stateCache.putIfAbsentAndGet(channelUID, () -> soapConnector == null ? UnDefType.UNDEF
-                    : soapConnector.getChannelStateFromDevice(channelConfig, channels, stateCache));
-            if (state != null) {
-                updateState(channelUID, state);
+            if (linkedChannels.contains(channelUID)) {
+                State state = stateCache.putIfAbsentAndGet(channelUID, () -> soapConnector == null ? UnDefType.UNDEF
+                        : soapConnector.getChannelStateFromDevice(channelConfig, channels, stateCache));
+                if (state != null) {
+                    updateState(channelUID, state);
+                }
             }
         });
     }
@@ -235,6 +239,20 @@ public class Tr064SubHandler extends BaseThingHandler {
                         TimeUnit.SECONDS);
             }
         }
+    }
+
+    @Override
+    public void channelLinked(ChannelUID channelUID) {
+        linkedChannels.add(channelUID);
+        super.channelLinked(channelUID);
+        logger.debug("Channel {} linked", channelUID);
+    }
+
+    @Override
+    public void channelUnlinked(ChannelUID channelUID) {
+        super.channelUnlinked(channelUID);
+        linkedChannels.remove(channelUID);
+        logger.debug("Channel {} unlinked", channelUID);
     }
 
     /**
