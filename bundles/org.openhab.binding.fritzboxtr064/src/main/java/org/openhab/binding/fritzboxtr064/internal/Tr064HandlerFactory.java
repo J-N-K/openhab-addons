@@ -12,13 +12,22 @@
  */
 package org.openhab.binding.fritzboxtr064.internal;
 
-import java.util.*;
+import java.net.http.HttpClient;
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
+import java.util.HashMap;
+import java.util.Hashtable;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
-import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.smarthome.config.discovery.DiscoveryService;
 import org.eclipse.smarthome.core.thing.Bridge;
 import org.eclipse.smarthome.core.thing.Thing;
@@ -27,11 +36,13 @@ import org.eclipse.smarthome.core.thing.ThingUID;
 import org.eclipse.smarthome.core.thing.binding.BaseThingHandlerFactory;
 import org.eclipse.smarthome.core.thing.binding.ThingHandler;
 import org.eclipse.smarthome.core.thing.binding.ThingHandlerFactory;
-import org.eclipse.smarthome.io.net.http.HttpClientFactory;
+import org.eclipse.smarthome.io.net.http.TrustAllTrustMananger;
 import org.osgi.framework.ServiceRegistration;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
+
+import static org.openhab.binding.fritzboxtr064.internal.Tr064BindingConstants.CONNECT_TIMEOUT;
 
 /**
  * The {@link Tr064HandlerFactory} is responsible for creating things and thing
@@ -51,9 +62,11 @@ public class Tr064HandlerFactory extends BaseThingHandlerFactory {
     private final Map<ThingUID, ServiceRegistration<?>> discoveryServiceRegs = new HashMap<>();
 
     @Activate
-    public Tr064HandlerFactory(@Reference HttpClientFactory httpClientFactory,
-            @Reference Tr064DynamicStateDescriptionProvider dynamicStateDescriptionProvider) {
-        httpClient = httpClientFactory.getCommonHttpClient();
+    public Tr064HandlerFactory(@Reference Tr064DynamicStateDescriptionProvider dynamicStateDescriptionProvider)
+            throws KeyManagementException, NoSuchAlgorithmException {
+        SSLContext sc = SSLContext.getInstance("TLS");
+        sc.init(null, new TrustManager[] { TrustAllTrustMananger.getInstance() }, new java.security.SecureRandom());
+        httpClient = HttpClient.newBuilder().sslContext(sc).connectTimeout(CONNECT_TIMEOUT).build();
         this.dynamicStateDescriptionProvider = dynamicStateDescriptionProvider;
     }
 

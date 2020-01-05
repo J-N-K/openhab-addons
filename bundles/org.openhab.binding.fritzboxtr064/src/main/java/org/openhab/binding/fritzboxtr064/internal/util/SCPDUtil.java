@@ -12,12 +12,15 @@
  */
 package org.openhab.binding.fritzboxtr064.internal.util;
 
-import java.io.ByteArrayInputStream;
-import java.io.InputStream;
+import java.io.IOException;
+import java.io.StringReader;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.net.http.HttpResponse.BodyHandlers;
+import java.time.Duration;
 import java.util.*;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -28,9 +31,6 @@ import javax.xml.transform.stream.StreamSource;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
-import org.eclipse.jetty.client.HttpClient;
-import org.eclipse.jetty.client.api.ContentResponse;
-import org.eclipse.jetty.http.HttpMethod;
 import org.openhab.binding.fritzboxtr064.internal.SCPDException;
 import org.openhab.binding.fritzboxtr064.internal.model.scpd.root.SCPDDeviceType;
 import org.openhab.binding.fritzboxtr064.internal.model.scpd.root.SCPDRootType;
@@ -85,14 +85,14 @@ public class SCPDUtil {
      */
     private <T> @Nullable T getAndUnmarshalSCPD(String uri, Class<T> clazz) {
         try {
-            ContentResponse contentResponse = httpClient.newRequest(uri).timeout(2, TimeUnit.SECONDS)
-                    .method(HttpMethod.GET).send();
-            InputStream xml = new ByteArrayInputStream(contentResponse.getContent());
+            HttpResponse<String> response = httpClient.send(
+                    HttpRequest.newBuilder(URI.create(uri)).timeout(Duration.ofMillis(2000)).GET().build(),
+                    BodyHandlers.ofString());
 
             JAXBContext context = JAXBContext.newInstance(clazz);
             Unmarshaller um = context.createUnmarshaller();
-            return um.unmarshal(new StreamSource(xml), clazz).getValue();
-        } catch (ExecutionException | InterruptedException | TimeoutException e) {
+            return um.unmarshal(new StreamSource(new StringReader(response.body())), clazz).getValue();
+        } catch (InterruptedException | IOException e) {
             logger.debug("HTTP Failed to GET uri '{}': {}", uri, e.getMessage());
         } catch (JAXBException e) {
             logger.debug("Unmarshalling failed: {}", e.getMessage());

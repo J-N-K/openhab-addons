@@ -12,26 +12,8 @@
  */
 package org.openhab.binding.fritzboxtr064.internal;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.stream.Collectors;
-
-import javax.xml.soap.*;
-
 import org.eclipse.jdt.annotation.NonNullByDefault;
-import org.eclipse.jetty.client.HttpClient;
-import org.eclipse.jetty.client.api.ContentResponse;
-import org.eclipse.jetty.client.api.Request;
-import org.eclipse.jetty.client.util.BytesContentProvider;
-import org.eclipse.jetty.http.HttpMethod;
-import org.eclipse.jetty.http.HttpStatus;
+import org.eclipse.jdt.annotation.Nullable;
 import org.eclipse.smarthome.core.cache.ExpiringCacheMap;
 import org.eclipse.smarthome.core.library.types.OnOffType;
 import org.eclipse.smarthome.core.library.types.StringType;
@@ -47,6 +29,22 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.w3c.dom.NodeList;
 
+import javax.xml.soap.*;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import static org.openhab.binding.fritzboxtr064.internal.Tr064BindingConstants.REQUEST_TIMEOUT;
+
 /**
  * The {@link SOAPConnector} provides communication with a remote SOAP device
  *
@@ -54,14 +52,16 @@ import org.w3c.dom.NodeList;
  */
 @NonNullByDefault
 public class SOAPConnector {
-    private static final int SOAP_TIMEOUT = 2000; // in ms
     private final Logger logger = LoggerFactory.getLogger(SOAPConnector.class);
     private final HttpClient httpClient;
     private final String endpointBaseURL;
+    private final @Nullable DigestAuthorization digestAuthorization;
     private final SOAPValueConverter soapValueConverter;
 
-    public SOAPConnector(HttpClient httpClient, String endpointBaseURL) {
+    public SOAPConnector(HttpClient httpClient, @Nullable DigestAuthorization digestAuthorization,
+            String endpointBaseURL) {
         this.httpClient = httpClient;
+        this.digestAuthorization = digestAuthorization;
         this.endpointBaseURL = endpointBaseURL;
         soapValueConverter = new SOAPValueConverter(httpClient);
     }
@@ -76,13 +76,11 @@ public class SOAPConnector {
      * @throws IOException if a problem while writing the SOAP message to the Request occurs
      * @throws SOAPException if a problem with creating the SOAP message occurs
      */
-    @SuppressWarnings("unchecked")
-    private Request prepareSOAPRequest(SCPDServiceType service, String soapAction, Map<String, String> arguments)
-            throws IOException, SOAPException {
+    private HttpRequest.Builder prepareSOAPRequest(SCPDServiceType service, String soapAction,
+            Map<String, String> arguments) throws IOException, SOAPException {
         MessageFactory messageFactory = MessageFactory.newInstance();
         SOAPMessage soapMessage = messageFactory.createMessage();
-        SOAPPart soapPart = soapMessage.getSOAPPart();
-        SOAPEnvelope envelope = soapPart.getEnvelope();
+        SOAPEnvelope envelope = soapMessage.getSOAPPart().getEnvelope();
         envelope.setEncodingStyle("http://schemas.xmlsoap.org/soap/encoding/");
 
         // SOAP body
@@ -98,22 +96,28 @@ public class SOAPConnector {
             }
         });
 
-        // SOAP headers
-        MimeHeaders headers = soapMessage.getMimeHeaders();
-        headers.addHeader("SOAPAction", service.getServiceType() + "#" + soapAction);
-        soapMessage.saveChanges();
-
         // create Request and add headers and content
-        Request request = httpClient.newRequest(endpointBaseURL + service.getControlURL()).method(HttpMethod.POST);
-        ((Iterator<MimeHeader>) soapMessage.getMimeHeaders().getAllHeaders())
-                .forEachRemaining(header -> request.header(header.getName(), header.getValue()));
-        try (final ByteArrayOutputStream os = new ByteArrayOutputStream()) {
-            soapMessage.writeTo(os);
-            byte[] content = os.toByteArray();
-            request.content(new BytesContentProvider(content));
+        URI uri = URI.create(endpointBaseURL + service.getControlURL());
+        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder(uri).timeout(REQUEST_TIMEOUT);
+        requestBuilder.header("SOAPAction", service.getServiceType() + "#" + soapAction);
+        requestBuilder.header("Accept", "text/xml"); // headers.getHeader("Accept")[0]);
+        requestBuilder.header("Content-Type", "text/xml; charset=utf-8");
+
+        if (digestAuthorization != null) {
+            String authHeader = digestAuthorization.getAuthorization(uri, "POST");
+            if (authHeader != null) {
+                requestBuilder.header("Authorization", authHeader);
+            }
         }
 
-        return request;
+        try (final ByteArrayOutputStream os = new ByteArrayOutputStream()) {
+            soapMessage.writeTo(os);
+            String content = new String(os.toByteArray(), StandardCharsets.UTF_8);
+            requestBuilder.POST(HttpRequest.BodyPublishers.ofString(content, StandardCharsets.UTF_8));
+            logger.debug("Request-Body: {}", content);
+        }
+
+        return requestBuilder;
     }
 
     /**
@@ -128,22 +132,21 @@ public class SOAPConnector {
     public synchronized SOAPMessage doSOAPRequest(SCPDServiceType service, String soapAction,
             Map<String, String> arguments) throws Tr064CommunicationException {
         try {
-            Request request = prepareSOAPRequest(service, soapAction, arguments).timeout(SOAP_TIMEOUT,
-                    TimeUnit.MILLISECONDS);
-            request.getContent().forEach(buffer -> logger.trace("Request: {}", new String(buffer.array())));
+            HttpRequest.Builder requestBuilder = prepareSOAPRequest(service, soapAction, arguments);
+            HttpRequest request = requestBuilder.build();
+            logger.trace("Sending Request with headers: {}", request.headers());
+            HttpResponse<byte[]> response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
+            logger.trace("Response: {} - {}", response.headers(), response.body());
 
-            ContentResponse response = request.send();
-            if (response.getStatus() == HttpStatus.UNAUTHORIZED_401) {
-                // retry once if authentication expired
-                logger.trace("Re-Auth needed.");
-                httpClient.getAuthenticationStore().clearAuthenticationResults();
-                request = prepareSOAPRequest(service, soapAction, arguments).timeout(SOAP_TIMEOUT,
-                        TimeUnit.MILLISECONDS);
-                response = request.send();
+            if (response.statusCode() == 401) {
+                digestAuthorization.updateNonce(response.headers());
+                requestBuilder.setHeader("Authorization", digestAuthorization.getAuthorization(response.uri(), "POST"));
+                logger.trace("Resending Request with new authorization header");
+                response = httpClient.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofByteArray());
+                logger.trace("Response: {} - {}", response.headers(), response.body());
             }
-            try (final ByteArrayInputStream is = new ByteArrayInputStream(response.getContent())) {
-                logger.trace("Received response: {}", response.getContentAsString());
 
+            try (final ByteArrayInputStream is = new ByteArrayInputStream(response.body())) {
                 SOAPMessage soapMessage = MessageFactory.newInstance().createMessage(null, is);
                 if (soapMessage.getSOAPBody().hasFault()) {
                     String soapError = "unknown";
@@ -156,15 +159,17 @@ public class SOAPConnector {
                     if (nodeList != null && nodeList.getLength() > 0) {
                         soapReason = nodeList.item(0).getTextContent();
                     }
-                    String error = String.format("HTTP-Response-Code %d (%s), SOAP-Fault: %s (%s)",
-                            response.getStatus(), response.getReason(), soapError, soapReason);
+                    String error = String
+                            .format("HTTP-Response-Status-Code %d, SOAP-Fault: %s (%s)", response.statusCode(),
+                                    soapError, soapReason);
                     throw new Tr064CommunicationException(error);
                 }
                 return soapMessage;
             }
-        } catch (IOException | SOAPException | InterruptedException | TimeoutException | ExecutionException e) {
+        } catch (IOException | SOAPException | InterruptedException e) {
             throw new Tr064CommunicationException(e);
         }
+
     }
 
     /**
@@ -176,25 +181,24 @@ public class SOAPConnector {
     public void sendChannelCommandToDevice(Tr064ChannelConfig channelConfig, Command command) {
         soapValueConverter.getSOAPValueFromCommand(command, channelConfig.getDataType(),
                 channelConfig.getChannelType().getItem().getUnit()).ifPresentOrElse(value -> {
-                    final ChannelType channelType = channelConfig.getChannelType();
-                    final SCPDServiceType service = channelConfig.getService();
-                    logger.debug("Sending {} as {} to {}/{}", command, value, service.getServiceId(),
-                            channelType.getSetAction().getName());
-                    try {
-                        Map<String, String> arguments = new HashMap<>();
-                        if (channelType.getSetAction().getArgument() != null) {
-                            arguments.put(channelType.getSetAction().getArgument(), value);
-                        }
-                        String parameter = channelConfig.getParameter();
-                        if (parameter != null) {
-                            arguments.put(channelConfig.getChannelType().getGetAction().getParameter().getName(),
-                                    parameter);
-                        }
-                        doSOAPRequest(service, channelType.getSetAction().getName(), arguments);
-                    } catch (Tr064CommunicationException e) {
-                        logger.warn("Could not send command {}: {}", command, e.getMessage());
-                    }
-                }, () -> logger.info("Could not convert {} to SOAP value", command));
+            final ChannelType channelType = channelConfig.getChannelType();
+            final SCPDServiceType service = channelConfig.getService();
+            logger.debug("Sending {} as {} to {}/{}", command, value, service.getServiceId(),
+                    channelType.getSetAction().getName());
+            try {
+                Map<String, String> arguments = new HashMap<>();
+                if (channelType.getSetAction().getArgument() != null) {
+                    arguments.put(channelType.getSetAction().getArgument(), value);
+                }
+                String parameter = channelConfig.getParameter();
+                if (parameter != null) {
+                    arguments.put(channelConfig.getChannelType().getGetAction().getParameter().getName(), parameter);
+                }
+                doSOAPRequest(service, channelType.getSetAction().getName(), arguments);
+            } catch (Tr064CommunicationException e) {
+                logger.warn("Could not send command {}: {}", command, e.getMessage());
+            }
+        }, () -> logger.info("Could not convert {} to SOAP value", command));
     }
 
     /**
@@ -232,19 +236,18 @@ public class SOAPConnector {
             String argumentName = channelConfig.getChannelType().getGetAction().getArgument();
             // find all other channels with the same action that are already in cache, so we can update them
             Map<ChannelUID, Tr064ChannelConfig> channelsInRequest = channelConfigMap.entrySet().stream()
-                    .filter(map -> getAction.equals(map.getValue().getGetAction())
-                            && stateCache.containsKey(map.getKey())
-                            && !argumentName.equals(map.getValue().getChannelType().getGetAction().getArgument()))
+                    .filter(map -> getAction.equals(map.getValue().getGetAction()) && stateCache
+                            .containsKey(map.getKey()) && !argumentName
+                            .equals(map.getValue().getChannelType().getGetAction().getArgument()))
                     .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-            channelsInRequest
-                    .forEach((channelUID, channelConfig1) -> soapValueConverter
-                            .getStateFromSOAPValue(soapResponse,
-                                    channelConfig1.getChannelType().getGetAction().getArgument(), channelConfig1)
-                            .ifPresent(state -> stateCache.putValue(channelUID, state)));
+            channelsInRequest.forEach((channelUID, channelConfig1) -> soapValueConverter
+                    .getStateFromSOAPValue(soapResponse, channelConfig1.getChannelType().getGetAction().getArgument(),
+                            channelConfig1).ifPresent(state -> stateCache.putValue(channelUID, state)));
 
-            return soapValueConverter.getStateFromSOAPValue(soapResponse, argumentName, channelConfig)
-                    .orElseThrow(() -> new Tr064CommunicationException("failed to transform '"
-                            + channelConfig.getChannelType().getGetAction().getArgument() + "'"));
+            return soapValueConverter.getStateFromSOAPValue(soapResponse, argumentName, channelConfig).orElseThrow(
+                    () -> new Tr064CommunicationException(
+                            "failed to transform '" + channelConfig.getChannelType().getGetAction()
+                                    .getArgument() + "'"));
         } catch (Tr064CommunicationException e) {
             logger.info("Failed to get {}: {}", channelConfig, e.getMessage());
             return UnDefType.UNDEF;

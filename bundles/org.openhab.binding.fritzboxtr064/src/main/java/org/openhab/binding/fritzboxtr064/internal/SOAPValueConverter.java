@@ -12,21 +12,22 @@
  */
 package org.openhab.binding.fritzboxtr064.internal;
 
+import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.math.BigDecimal;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.Optional;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 import javax.xml.soap.SOAPException;
 import javax.xml.soap.SOAPMessage;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
-import org.eclipse.jetty.client.HttpClient;
-import org.eclipse.jetty.client.api.ContentResponse;
 import org.eclipse.smarthome.core.library.types.DecimalType;
 import org.eclipse.smarthome.core.library.types.OnOffType;
 import org.eclipse.smarthome.core.library.types.QuantityType;
@@ -37,6 +38,8 @@ import org.openhab.binding.fritzboxtr064.internal.config.Tr064ChannelConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.w3c.dom.NodeList;
+
+import static org.openhab.binding.fritzboxtr064.internal.Tr064BindingConstants.REQUEST_TIMEOUT;
 
 /**
  * The {@link SOAPValueConverter} converts SOAP values and openHAB states
@@ -173,13 +176,14 @@ public class SOAPValueConverter {
     @SuppressWarnings("unused")
     private State processTamListURL(State state, Tr064ChannelConfig channelConfig) throws PostProcessingException {
         try {
-            ContentResponse response = httpClient.newRequest(state.toString()).timeout(1000, TimeUnit.MILLISECONDS)
-                    .send();
-            String responseContent = response.getContentAsString();
-            int messageCount = responseContent.split("<New>1</New>").length - 1;
+            HttpRequest request = HttpRequest.newBuilder(URI.create(state.toString())).GET()
+                    .timeout(REQUEST_TIMEOUT).build();
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            int messageCount = response.body().split("<New>1</New>").length - 1;
 
             return new DecimalType(messageCount);
-        } catch (InterruptedException | TimeoutException | ExecutionException e) {
+        } catch (InterruptedException | IOException e) {
             throw new PostProcessingException("Failed to get TAM list from URL " + state.toString());
         }
     }
@@ -247,13 +251,13 @@ public class SOAPValueConverter {
      */
     private State processCallList(State state, @Nullable String days, String type) throws PostProcessingException {
         try {
-            ContentResponse response = httpClient.newRequest(state.toString() + "&days=" + days)
-                    .timeout(1000, TimeUnit.MILLISECONDS).send();
-            String responseContent = response.getContentAsString();
-            int callCount = responseContent.split("<Type>" + type + "</Type>").length - 1;
+            HttpRequest request = HttpRequest.newBuilder(URI.create(state.toString() + "&days=" + days)).GET()
+                    .timeout(REQUEST_TIMEOUT).build();
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            int callCount = response.body().split("<Type>" + type + "</Type>").length - 1;
 
             return new DecimalType(callCount);
-        } catch (InterruptedException | TimeoutException | ExecutionException e) {
+        } catch (InterruptedException | IOException e) {
             throw new PostProcessingException("Failed to get Call list from URL " + state.toString());
         }
     }

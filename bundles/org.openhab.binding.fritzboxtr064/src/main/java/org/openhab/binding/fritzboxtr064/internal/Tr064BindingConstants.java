@@ -12,6 +12,7 @@
  */
 package org.openhab.binding.fritzboxtr064.internal;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -35,6 +36,9 @@ public class Tr064BindingConstants {
     public static final ThingTypeUID THING_TYPE_SUBDEVICE_LAN = new ThingTypeUID(BINDING_ID, "subdeviceLan");
 
     public static final List<ChannelType> CHANNEL_TYPES = new ArrayList<>();
+
+    public static final Duration CONNECT_TIMEOUT = Duration.ofMillis(1500);
+    public static final Duration REQUEST_TIMEOUT = Duration.ofMillis(1500);
 
     static {
         CHANNEL_TYPES.addAll(Util.readXMLChannelConfig());

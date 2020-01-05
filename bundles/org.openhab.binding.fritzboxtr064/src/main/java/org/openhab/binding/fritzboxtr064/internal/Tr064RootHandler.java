@@ -14,8 +14,8 @@ package org.openhab.binding.fritzboxtr064.internal;
 
 import static org.openhab.binding.fritzboxtr064.internal.Tr064BindingConstants.THING_TYPE_ROOTDEVICE;
 
-import java.net.URI;
-import java.net.URISyntaxException;
+import java.net.http.HttpClient;
+import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
@@ -26,10 +26,6 @@ import javax.xml.soap.SOAPMessage;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
-import org.eclipse.jetty.client.HttpClient;
-import org.eclipse.jetty.client.api.Authentication;
-import org.eclipse.jetty.client.api.AuthenticationStore;
-import org.eclipse.jetty.client.util.DigestAuthentication;
 import org.eclipse.smarthome.core.cache.ExpiringCacheMap;
 import org.eclipse.smarthome.core.thing.*;
 import org.eclipse.smarthome.core.thing.binding.BaseBridgeHandler;
@@ -85,7 +81,7 @@ public class Tr064RootHandler extends BaseBridgeHandler {
         super(bridge);
         this.httpClient = httpClient;
         this.dynamicStateDescriptionProvider = dynamicStateDescriptionProvider;
-        soapConnector = new SOAPConnector(httpClient, endpointBaseURL);
+        soapConnector = new SOAPConnector(httpClient, null, endpointBaseURL);
     }
 
     @Override
@@ -215,18 +211,19 @@ public class Tr064RootHandler extends BaseBridgeHandler {
                     soapValueConverter.getStateFromSOAPValue(soapResponse, "NewSecurityPort", null)
                             .ifPresentOrElse(port -> {
                                 endpointBaseURL = "https://" + config.host + ":" + port.toString();
-                                soapConnector = new SOAPConnector(httpClient, endpointBaseURL);
                                 logger.debug("endpointBaseURL is now '{}'", endpointBaseURL);
                             }, () -> logger.warn("Could not determine secure port, disabling https"));
                 } else {
                     logger.warn("Could not determine secure port, disabling https");
                 }
 
-                // clear auth cache and force re-auth
-                httpClient.getAuthenticationStore().clearAuthenticationResults();
-                AuthenticationStore auth = httpClient.getAuthenticationStore();
-                auth.addAuthentication(new DigestAuthentication(new URI(endpointBaseURL), Authentication.ANY_REALM,
-                        config.user, config.password));
+                try {
+                    soapConnector = new SOAPConnector(httpClient,
+                            new DigestAuthorization(config.user, config.password, "HTTPS Access"), endpointBaseURL);
+                } catch (NoSuchAlgorithmException e) {
+                    logger.warn("Could not initialize authorizer: {}", e.getMessage());
+                    return false;
+                }
 
                 // check & update properties
                 SCPDActionType getInfoAction = scpdUtil.getService(deviceService.getServiceId())
@@ -247,7 +244,7 @@ public class Tr064RootHandler extends BaseBridgeHandler {
                 updateProperties(properties);
 
                 return true;
-            } catch (SCPDException | SOAPException | Tr064CommunicationException | URISyntaxException e) {
+            } catch (SCPDException | SOAPException | Tr064CommunicationException e) {
                 updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, e.getMessage());
                 return false;
             }
