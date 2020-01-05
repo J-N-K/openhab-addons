@@ -12,6 +12,8 @@
  */
 package org.openhab.binding.fritzboxtr064.internal;
 
+import static org.openhab.binding.fritzboxtr064.internal.Tr064BindingConstants.REQUEST_TIMEOUT;
+
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -20,7 +22,6 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.util.Optional;
 
 import javax.xml.soap.SOAPException;
@@ -38,8 +39,6 @@ import org.openhab.binding.fritzboxtr064.internal.config.Tr064ChannelConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.w3c.dom.NodeList;
-
-import static org.openhab.binding.fritzboxtr064.internal.Tr064BindingConstants.REQUEST_TIMEOUT;
 
 /**
  * The {@link SOAPValueConverter} converts SOAP values and openHAB states
@@ -176,8 +175,8 @@ public class SOAPValueConverter {
     @SuppressWarnings("unused")
     private State processTamListURL(State state, Tr064ChannelConfig channelConfig) throws PostProcessingException {
         try {
-            HttpRequest request = HttpRequest.newBuilder(URI.create(state.toString())).GET()
-                    .timeout(REQUEST_TIMEOUT).build();
+            HttpRequest request = HttpRequest.newBuilder(URI.create(state.toString())).GET().timeout(REQUEST_TIMEOUT)
+                    .build();
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
             int messageCount = response.body().split("<New>1</New>").length - 1;

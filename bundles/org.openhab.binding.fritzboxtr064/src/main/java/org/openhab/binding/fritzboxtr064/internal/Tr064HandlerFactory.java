@@ -12,10 +12,11 @@
  */
 package org.openhab.binding.fritzboxtr064.internal;
 
+import static org.openhab.binding.fritzboxtr064.internal.Tr064BindingConstants.CONNECT_TIMEOUT;
+
 import java.net.http.HttpClient;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
-import java.time.Duration;
 import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Map;
@@ -41,8 +42,6 @@ import org.osgi.framework.ServiceRegistration;
 import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
-
-import static org.openhab.binding.fritzboxtr064.internal.Tr064BindingConstants.CONNECT_TIMEOUT;
 
 /**
  * The {@link Tr064HandlerFactory} is responsible for creating things and thing

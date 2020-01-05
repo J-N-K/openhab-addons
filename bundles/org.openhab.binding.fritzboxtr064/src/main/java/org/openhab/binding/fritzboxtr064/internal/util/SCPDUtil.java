@@ -12,14 +12,15 @@
  */
 package org.openhab.binding.fritzboxtr064.internal.util;
 
+import static org.openhab.binding.fritzboxtr064.internal.Tr064BindingConstants.REQUEST_TIMEOUT;
+
 import java.io.IOException;
-import java.io.StringReader;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
-import java.time.Duration;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -85,13 +86,13 @@ public class SCPDUtil {
      */
     private <T> @Nullable T getAndUnmarshalSCPD(String uri, Class<T> clazz) {
         try {
-            HttpResponse<String> response = httpClient.send(
-                    HttpRequest.newBuilder(URI.create(uri)).timeout(Duration.ofMillis(2000)).GET().build(),
-                    BodyHandlers.ofString());
+            HttpResponse<InputStream> response = httpClient.send(
+                    HttpRequest.newBuilder(URI.create(uri)).timeout(REQUEST_TIMEOUT).GET().build(),
+                    BodyHandlers.ofInputStream());
 
             JAXBContext context = JAXBContext.newInstance(clazz);
             Unmarshaller um = context.createUnmarshaller();
-            return um.unmarshal(new StreamSource(new StringReader(response.body())), clazz).getValue();
+            return um.unmarshal(new StreamSource(response.body()), clazz).getValue();
         } catch (InterruptedException | IOException e) {
             logger.debug("HTTP Failed to GET uri '{}': {}", uri, e.getMessage());
         } catch (JAXBException e) {

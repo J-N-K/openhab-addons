@@ -78,9 +78,7 @@ public class DigestAuthorization {
         messageDigest.update((uri.getPath() + ":" + System.currentTimeMillis()).getBytes());
         String cnonce = HexUtils.bytesToHex(messageDigest.digest()).toLowerCase();
 
-        nonceCounter++;
-
-        String nc = String.format("%08d", nonceCounter);
+        String nc = String.format("%08x", nonceCounter++);
 
         // calculate response value
         messageDigest.reset();
