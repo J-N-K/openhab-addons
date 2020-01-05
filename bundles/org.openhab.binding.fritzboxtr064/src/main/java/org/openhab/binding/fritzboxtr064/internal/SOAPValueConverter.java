@@ -12,6 +12,7 @@
  */
 package org.openhab.binding.fritzboxtr064.internal;
 
+import static org.openhab.binding.fritzboxtr064.internal.util.Util.getSOAPElement;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.math.BigDecimal;
@@ -20,7 +21,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import javax.xml.soap.SOAPException;
 import javax.xml.soap.SOAPMessage;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
@@ -36,7 +36,6 @@ import org.eclipse.smarthome.core.types.State;
 import org.openhab.binding.fritzboxtr064.internal.config.Tr064ChannelConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.w3c.dom.NodeList;
 
 /**
  * The {@link SOAPValueConverter} converts SOAP values and openHAB states
@@ -106,60 +105,51 @@ public class SOAPValueConverter {
      * @param element the element that needs to be extracted
      * @param channelConfig the channel config containing additional information (if null a data-type "string" and
      *            missing unit is assumed)
-     * @return an Optional of State conating the converted value
+     * @return an Optional of State containing the converted value
      */
     @SuppressWarnings("null")
     public Optional<State> getStateFromSOAPValue(SOAPMessage soapMessage, String element,
             @Nullable Tr064ChannelConfig channelConfig) {
         String dataType = channelConfig != null ? channelConfig.getDataType() : "string";
         String unit = channelConfig != null ? channelConfig.getChannelType().getItem().getUnit() : "";
-        State returnState = null;
 
-        try {
-            NodeList nodeList = soapMessage.getSOAPBody().getElementsByTagName(element);
-            if (nodeList != null && nodeList.getLength() > 0) {
-                String rawValue = nodeList.item(0).getTextContent();
-                switch (dataType) {
-                    case "boolean":
-                        returnState = rawValue.equals("0") ? OnOffType.OFF : OnOffType.ON;
-                        break;
-                    case "string":
-                        returnState = new StringType(rawValue);
-                        break;
-                    case "ui2":
-                    case "ui4":
-                        if (!unit.isEmpty()) {
-                            returnState = new QuantityType<>(rawValue + " " + unit);
-                        } else {
-                            returnState = new DecimalType(rawValue);
-                        }
-                        break;
-                    default:
-                }
-            }
-
-            // check if we need post processing
-            if (returnState != null && channelConfig != null
-                    && channelConfig.getChannelType().getGetAction().getPostProcessor() != null) {
-                String postProcessor = channelConfig.getChannelType().getGetAction().getPostProcessor();
-                try {
-                    Method method = SOAPValueConverter.class.getDeclaredMethod(postProcessor, State.class,
-                            Tr064ChannelConfig.class);
-                    Object o = method.invoke(this, returnState, channelConfig);
-                    if (o instanceof State) {
-                        returnState = (State) o;
+        return getSOAPElement(soapMessage, element).map(rawValue -> {
+            // map rawValue to State
+            switch (dataType) {
+                case "boolean":
+                    return rawValue.equals("0") ? OnOffType.OFF : OnOffType.ON;
+                case "string":
+                    return new StringType(rawValue);
+                case "ui2":
+                case "ui4":
+                    if (!unit.isEmpty()) {
+                        return new QuantityType<>(rawValue + " " + unit);
+                    } else {
+                        return new DecimalType(rawValue);
                     }
-                } catch (NoSuchMethodException | IllegalAccessException e) {
-                    logger.warn("Postprocessor {} not found, this most likely is a programming error", postProcessor,
-                            e);
-                } catch (InvocationTargetException e) {
-                    logger.info("Postprocessor {} failed: {}", postProcessor, e.getCause().getMessage());
-                }
+                default:
+                    return null;
             }
-        } catch (SOAPException e) {
-            logger.warn("Could not get expected element {} from SOAP message {}", element, soapMessage);
-        }
-        return Optional.ofNullable(returnState);
+        }).map(state -> {
+            // check if we need post processing
+            if (channelConfig == null || channelConfig.getChannelType().getGetAction().getPostProcessor() == null) {
+                return state;
+            }
+            String postProcessor = channelConfig.getChannelType().getGetAction().getPostProcessor();
+            try {
+                Method method = SOAPValueConverter.class.getDeclaredMethod(postProcessor, State.class,
+                        Tr064ChannelConfig.class);
+                Object o = method.invoke(this, state, channelConfig);
+                if (o instanceof State) {
+                    return (State) o;
+                }
+            } catch (NoSuchMethodException | IllegalAccessException e) {
+                logger.warn("Postprocessor {} not found, this most likely is a programming error", postProcessor, e);
+            } catch (InvocationTargetException e) {
+                logger.info("Postprocessor {} failed: {}", postProcessor, e.getCause().getMessage());
+            }
+            return null;
+        });
     }
 
     /**

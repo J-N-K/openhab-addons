@@ -25,6 +25,8 @@ import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBElement;
 import javax.xml.bind.JAXBException;
 import javax.xml.bind.Unmarshaller;
+import javax.xml.soap.SOAPException;
+import javax.xml.soap.SOAPMessage;
 import javax.xml.transform.stream.StreamSource;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
@@ -47,7 +49,6 @@ import org.openhab.binding.fritzboxtr064.internal.model.config.ActionType;
 import org.openhab.binding.fritzboxtr064.internal.model.config.ChannelType;
 import org.openhab.binding.fritzboxtr064.internal.model.config.ChannelsType;
 import org.openhab.binding.fritzboxtr064.internal.model.config.ParameterType;
-import org.openhab.binding.fritzboxtr064.internal.model.scpd.root.SCPDDeviceType;
 import org.openhab.binding.fritzboxtr064.internal.model.scpd.root.SCPDServiceType;
 import org.openhab.binding.fritzboxtr064.internal.model.scpd.service.SCPDActionType;
 import org.openhab.binding.fritzboxtr064.internal.model.scpd.service.SCPDArgumentType;
@@ -55,6 +56,7 @@ import org.openhab.binding.fritzboxtr064.internal.model.scpd.service.SCPDScpdTyp
 import org.openhab.binding.fritzboxtr064.internal.model.scpd.service.SCPDStateVariableType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.w3c.dom.NodeList;
 
 /**
  * The {@link Util} is a set of helper functions
@@ -90,10 +92,10 @@ public class Util {
                     String serviceId = channelType.getService().getServiceId();
                     Set<String> parameters = new HashSet<>();
                     try {
-                        SCPDDeviceType device = scpdUtil.getDevice(deviceId)
-                                .orElseThrow(() -> new ChannelConfigException("Could not find device " + deviceId));
-                        SCPDServiceType deviceService = device.getServiceList().stream()
-                                .filter(service -> service.getServiceId().equals(serviceId)).findFirst()
+                        SCPDServiceType deviceService = scpdUtil.getDevice(deviceId)
+                                .map(device -> device.getServiceList().stream()
+                                        .filter(service -> service.getServiceId().equals(serviceId)).findFirst()
+                                        .orElse(null))
                                 .orElseThrow(() -> new ChannelConfigException("Service '" + serviceId + "' not found"));
                         SCPDScpdType serviceRoot = scpdUtil.getService(deviceService.getServiceId())
                                 .orElseThrow(() -> new ChannelConfigException(
@@ -260,5 +262,16 @@ public class Util {
             throw new ChannelConfigException("Could not get required parameter '" + channelId
                     + "' from thing config (missing, empty or invalid)");
         }
+    }
+
+    public static Optional<String> getSOAPElement(SOAPMessage soapMessage, String elementName) {
+        try {
+            NodeList nodeList = soapMessage.getSOAPBody().getElementsByTagName("errorCode");
+            if (nodeList != null && nodeList.getLength() > 0) {
+                return Optional.of(nodeList.item(0).getTextContent());
+            }
+        } catch (SOAPException e) {
+        }
+        return Optional.empty();
     }
 }
