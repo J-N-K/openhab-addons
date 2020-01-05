@@ -13,6 +13,7 @@
 package org.openhab.binding.fritzboxtr064.internal;
 
 import static org.openhab.binding.fritzboxtr064.internal.util.Util.getSOAPElement;
+
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.math.BigDecimal;
@@ -149,7 +150,7 @@ public class SOAPValueConverter {
                 logger.info("Postprocessor {} failed: {}", postProcessor, e.getCause().getMessage());
             }
             return null;
-        });
+        }).or(Optional::empty);
     }
 
     /**

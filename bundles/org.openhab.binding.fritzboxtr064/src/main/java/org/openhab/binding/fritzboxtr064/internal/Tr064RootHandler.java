@@ -181,10 +181,12 @@ public class Tr064RootHandler extends BaseBridgeHandler {
      */
     private void poll() {
         channels.forEach((channelUID, channelConfig) -> {
-            State state = stateCache.putIfAbsentAndGet(channelUID,
-                    () -> soapConnector.getChannelStateFromDevice(channelConfig, channels, stateCache));
-            if (state != null) {
-                updateState(channelUID, state);
+            if (linkedChannels.contains(channelUID)) {
+                State state = stateCache.putIfAbsentAndGet(channelUID,
+                        () -> soapConnector.getChannelStateFromDevice(channelConfig, channels, stateCache));
+                if (state != null) {
+                    updateState(channelUID, state);
+                }
             }
         });
     }

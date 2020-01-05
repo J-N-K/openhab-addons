@@ -266,7 +266,7 @@ public class Util {
 
     public static Optional<String> getSOAPElement(SOAPMessage soapMessage, String elementName) {
         try {
-            NodeList nodeList = soapMessage.getSOAPBody().getElementsByTagName("errorCode");
+            NodeList nodeList = soapMessage.getSOAPBody().getElementsByTagName(elementName);
             if (nodeList != null && nodeList.getLength() > 0) {
                 return Optional.of(nodeList.item(0).getTextContent());
             }
