@@ -13,6 +13,7 @@
 package org.openhab.binding.fritzboxtr064.internal;
 
 import static org.openhab.binding.fritzboxtr064.internal.util.Util.getSOAPElement;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;

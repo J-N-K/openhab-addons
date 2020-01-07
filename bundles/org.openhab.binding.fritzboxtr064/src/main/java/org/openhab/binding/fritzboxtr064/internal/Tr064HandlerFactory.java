@@ -79,6 +79,7 @@ public class Tr064HandlerFactory extends BaseThingHandlerFactory {
     }
 
     @Override
+    @SuppressWarnings("null")
     protected synchronized void removeHandler(ThingHandler thingHandler) {
         if (thingHandler instanceof Tr064RootHandler) {
             final ServiceRegistration<?> serviceReg = discoveryServiceRegs.remove(thingHandler.getThing().getUID());

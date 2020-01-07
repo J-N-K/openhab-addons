@@ -75,6 +75,7 @@ public class Tr064SubHandler extends BaseThingHandler {
     }
 
     @Override
+    @SuppressWarnings("null")
     public void handleCommand(ChannelUID channelUID, Command command) {
         Tr064ChannelConfig channelConfig = channels.get(channelUID);
         if (channelConfig == null) {
