@@ -89,6 +89,7 @@ public class Tr064RootHandler extends BaseBridgeHandler {
     }
 
     @Override
+    @SuppressWarnings("null")
     public void handleCommand(ChannelUID channelUID, Command command) {
         Tr064ChannelConfig channelConfig = channels.get(channelUID);
         if (channelConfig == null) {

@@ -55,6 +55,7 @@ public class SCPDUtil {
     private final List<SCPDDeviceType> scpdDevicesList = new ArrayList<>();
     private final Map<String, SCPDScpdType> serviceMap = new HashMap<>();
 
+    @SuppressWarnings("null")
     public SCPDUtil(HttpClient httpClient, String endpoint) throws SCPDException {
         this.httpClient = httpClient;
 
