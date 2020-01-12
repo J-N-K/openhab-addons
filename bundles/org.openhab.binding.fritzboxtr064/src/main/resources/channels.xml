@@ -2,7 +2,7 @@
 <channels xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="channelconfig"
 	xsi:noNamespaceSchemaLocation="xsd/channeltypes.xsd">
 	<!-- Root Device -->
-	<channel name="securityPort" label="Security Port">
+	<channel name="securityPort" label="Security Port" description="The port for connecting via HTTPS to the TR-064 service.">
 		<item type="Number"></item>
 		<service deviceType="urn:dslforum-org:device:InternetGatewayDevice:1"
 			serviceId="urn:DeviceInfo-com:serviceId:DeviceInfo1"></service>
@@ -14,7 +14,7 @@
 			serviceId="urn:DeviceInfo-com:serviceId:DeviceInfo1" />
 		<getAction name="GetInfo" argument="NewUpTime" />
 	</channel>
-	<channel name="deviceLog" label="Device Log">
+	<channel name="deviceLog" label="Device Log" description="A string containing the last log messages.">
 		<item type="String" />
 		<service deviceType="urn:dslforum-org:device:InternetGatewayDevice:1"
 			serviceId="urn:DeviceInfo-com:serviceId:DeviceInfo1" />
@@ -26,7 +26,7 @@
 			serviceId="urn:DeviceConfig-com:serviceId:DeviceConfig1" />
 		<setAction name="Reboot" />
 	</channel>
-	<channel name="tamEnable" label="TAM">
+	<channel name="tamEnable" label="TAM" description="Enable/Disable the answering machine with the given index.">
 		<item type="Switch" />
 		<service deviceType="urn:dslforum-org:device:InternetGatewayDevice:1"
 			serviceId="urn:X_AVM-DE_TAM-com:serviceId:X_AVM-DE_TAM1" />
@@ -37,7 +37,7 @@
 			<parameter name="NewIndex" thingParameter="tamIndices" />
 		</setAction>
 	</channel>
-	<channel name="tamNewMessages" label="TAM New Messages">
+	<channel name="tamNewMessages" label="TAM New Messages" description="The number of new messages of the given answering machine.">
 		<item type="Number" />
 		<service deviceType="urn:dslforum-org:device:InternetGatewayDevice:1"
 			serviceId="urn:X_AVM-DE_TAM-com:serviceId:X_AVM-DE_TAM1" />
@@ -45,7 +45,7 @@
 			<parameter name="NewIndex" thingParameter="tamIndices" />
 		</getAction>
 	</channel>
-	<channel name="callDeflectionEnable" label="Call Deflection">
+	<channel name="callDeflectionEnable" label="Call Deflection" description="Enable/Disable the call deflection setup with the given index.">
 		<item type="Switch" />
 		<service deviceType="urn:dslforum-org:device:InternetGatewayDevice:1"
 			serviceId="urn:X_AVM-DE_OnTel-com:serviceId:X_AVM-DE_OnTel1" />
@@ -56,7 +56,7 @@
 			<parameter name="NewDeflectionId" thingParameter="callDeflectionIndices" />
 		</setAction>
 	</channel>
-	<channel name="missedCalls" label="Missed Calls">
+	<channel name="missedCalls" label="Missed Calls" description="Number of missed calls within the given number of days.">
 		<item type="Number" />
 		<service deviceType="urn:dslforum-org:device:InternetGatewayDevice:1"
 			serviceId="urn:X_AVM-DE_OnTel-com:serviceId:X_AVM-DE_OnTel1" />
@@ -64,7 +64,7 @@
 			<parameter name="CallDays" thingParameter="missedCallDays" pattern="[0-9]+" internalOnly="true" />
 		</getAction>
 	</channel>
-	<channel name="rejectedCalls" label="Rejected Calls">
+	<channel name="rejectedCalls" label="Rejected Calls" description="Number of rejected calls within the given number of days.">
 		<item type="Number" />
 		<service deviceType="urn:dslforum-org:device:InternetGatewayDevice:1"
 			serviceId="urn:X_AVM-DE_OnTel-com:serviceId:X_AVM-DE_OnTel1" />
@@ -72,7 +72,7 @@
 			<parameter name="CallDays" thingParameter="rejectedCallDays" pattern="[0-9]+" internalOnly="true" />
 		</getAction>
 	</channel>
-	<channel name="inboundCalls" label="Inbound Calls">
+	<channel name="inboundCalls" label="Inbound Calls" description="Number of inbound calls within the given number of days.">
 		<item type="Number" />
 		<service deviceType="urn:dslforum-org:device:InternetGatewayDevice:1"
 			serviceId="urn:X_AVM-DE_OnTel-com:serviceId:X_AVM-DE_OnTel1" />
@@ -80,7 +80,7 @@
 			<parameter name="CallDays" thingParameter="inboundCallDays" pattern="[0-9]+" internalOnly="true" />
 		</getAction>
 	</channel>
-	<channel name="outboundCalls" label="Inbound Calls">
+	<channel name="outboundCalls" label="Outbound Calls" description="Number of outbound calls within the given number of days.">
 		<item type="Number" />
 		<service deviceType="urn:dslforum-org:device:InternetGatewayDevice:1"
 			serviceId="urn:X_AVM-DE_OnTel-com:serviceId:X_AVM-DE_OnTel1" />
@@ -90,28 +90,28 @@
 	</channel>
 
 	<!-- LAN Device -->
-	<channel name="wifi24GHzEnable" label="WiFi 2.4 GHz">
+	<channel name="wifi24GHzEnable" label="WiFi 2.4 GHz" description="Enable/Disable the 2.4 GHz WiFi device.">
 		<item type="Switch" />
 		<service deviceType="urn:dslforum-org:device:LANDevice:1"
 			serviceId="urn:WLANConfiguration-com:serviceId:WLANConfiguration1" />
 		<getAction name="GetInfo" argument="NewEnable" />
 		<setAction name="SetEnable" argument="NewEnable" />
 	</channel>
-	<channel name="wifi5GHzEnable" label="WiFi 5 GHz">
+	<channel name="wifi5GHzEnable" label="WiFi 5 GHz" description="Enable/Disable the 5.0 GHz WiFi device.">
 		<item type="Switch" />
 		<service deviceType="urn:dslforum-org:device:LANDevice:1"
 			serviceId="urn:WLANConfiguration-com:serviceId:WLANConfiguration2" />
 		<getAction name="GetInfo" argument="NewEnable" />
 		<setAction name="SetEnable" argument="NewEnable" />
 	</channel>
-	<channel name="wifiGuestEnable" label="WiFi Guest">
+	<channel name="wifiGuestEnable" label="WiFi Guest" description="Enable/Disable the guest WiFi.">
 		<item type="Switch" />
 		<service deviceType="urn:dslforum-org:device:LANDevice:1"
 			serviceId="urn:WLANConfiguration-com:serviceId:WLANConfiguration3" />
 		<getAction name="GetInfo" argument="NewEnable" />
 		<setAction name="SetEnable" argument="NewEnable" />
 	</channel>
-	<channel name="macOnline" label="MAC Online">
+	<channel name="macOnline" label="MAC Online" description="Online status of the device with the given MAC">
 		<item type="Switch" />
 		<service deviceType="urn:dslforum-org:device:LANDevice:1" serviceId="urn:LanDeviceHosts-com:serviceId:Hosts1" />
 		<getAction name="GetSpecificHostEntry" argument="NewActive">

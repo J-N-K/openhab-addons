@@ -12,26 +12,8 @@
  */
 package org.openhab.binding.fritzboxtr064.internal.util;
 
-import static org.openhab.binding.fritzboxtr064.internal.Tr064BindingConstants.CHANNEL_TYPES;
-import static org.openhab.binding.fritzboxtr064.internal.Tr064BindingConstants.THING_TYPE_ROOTDEVICE;
-
-import java.io.InputStream;
-import java.lang.reflect.Field;
-import java.util.*;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
-import javax.xml.bind.JAXBContext;
-import javax.xml.bind.JAXBElement;
-import javax.xml.bind.JAXBException;
-import javax.xml.bind.Unmarshaller;
-import javax.xml.soap.SOAPException;
-import javax.xml.soap.SOAPMessage;
-import javax.xml.transform.stream.StreamSource;
-
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
-import org.eclipse.smarthome.core.thing.Channel;
 import org.eclipse.smarthome.core.thing.ChannelUID;
 import org.eclipse.smarthome.core.thing.Thing;
 import org.eclipse.smarthome.core.thing.binding.builder.ChannelBuilder;
@@ -58,6 +40,22 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.w3c.dom.NodeList;
 
+import javax.xml.bind.JAXBContext;
+import javax.xml.bind.JAXBElement;
+import javax.xml.bind.JAXBException;
+import javax.xml.bind.Unmarshaller;
+import javax.xml.soap.SOAPException;
+import javax.xml.soap.SOAPMessage;
+import javax.xml.transform.stream.StreamSource;
+import java.io.InputStream;
+import java.lang.reflect.Field;
+import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import static org.openhab.binding.fritzboxtr064.internal.Tr064BindingConstants.CHANNEL_TYPES;
+import static org.openhab.binding.fritzboxtr064.internal.Tr064BindingConstants.THING_TYPE_ROOTDEVICE;
+
 /**
  * The {@link Util} is a set of helper functions
  *
@@ -83,22 +81,21 @@ public class Util {
     public static ThingBuilder checkAvailableChannels(Thing thing, ThingBuilder thingBuilder, SCPDUtil scpdUtil,
             String deviceId, String deviceType, Map<ChannelUID, Tr064ChannelConfig> channels,
             Tr064DynamicStateDescriptionProvider dynamicStateDescriptionProvider) {
-        Tr064BaseThingConfiguration thingConfig = thing.getThingTypeUID().equals(THING_TYPE_ROOTDEVICE)
-                ? thing.getConfiguration().as(Tr064RootConfiguration.class)
-                : thing.getConfiguration().as(Tr064SubConfiguration.class);
+        Tr064BaseThingConfiguration thingConfig = thing.getThingTypeUID().equals(THING_TYPE_ROOTDEVICE) ?
+                thing.getConfiguration().as(Tr064RootConfiguration.class) :
+                thing.getConfiguration().as(Tr064SubConfiguration.class);
         CHANNEL_TYPES.stream().filter(channel -> deviceType.equals(channel.getService().getDeviceType()))
                 .forEach(channelType -> {
                     String channelId = channelType.getName();
                     String serviceId = channelType.getService().getServiceId();
                     Set<String> parameters = new HashSet<>();
                     try {
-                        SCPDServiceType deviceService = scpdUtil.getDevice(deviceId)
-                                .map(device -> device.getServiceList().stream()
-                                        .filter(service -> service.getServiceId().equals(serviceId)).findFirst()
-                                        .orElse(null))
+                        SCPDServiceType deviceService = scpdUtil.getDevice(deviceId).flatMap(
+                                device -> device.getServiceList().stream()
+                                        .filter(service -> service.getServiceId().equals(serviceId)).findFirst())
                                 .orElseThrow(() -> new ChannelConfigException("Service '" + serviceId + "' not found"));
-                        SCPDScpdType serviceRoot = scpdUtil.getService(deviceService.getServiceId())
-                                .orElseThrow(() -> new ChannelConfigException(
+                        SCPDScpdType serviceRoot = scpdUtil.getService(deviceService.getServiceId()).orElseThrow(
+                                () -> new ChannelConfigException(
                                         "Service definition for '" + serviceId + "' not found"));
                         Tr064ChannelConfig channelConfig = new Tr064ChannelConfig(channelType, deviceService);
 
@@ -108,21 +105,21 @@ public class Util {
                             String actionName = getAction.getName();
                             String argumentName = getAction.getArgument();
                             SCPDActionType scpdAction = serviceRoot.getActionList().stream()
-                                    .filter(action -> actionName.equals(action.getName())).findFirst()
-                                    .orElseThrow(() -> new ChannelConfigException(
-                                            "Get-Action '" + actionName + "' not found"));
+                                    .filter(action -> actionName.equals(action.getName())).findFirst().orElseThrow(
+                                            () -> new ChannelConfigException(
+                                                    "Get-Action '" + actionName + "' not found"));
                             SCPDArgumentType scpdArgument = scpdAction.getArgumentList().stream()
-                                    .filter(argument -> argument.getName().equals(argumentName)
-                                            && argument.getDirection().equals("out"))
-                                    .findFirst().orElseThrow(() -> new ChannelConfigException(
-                                            "Get-Argument '" + argumentName + "' not found"));
+                                    .filter(argument -> argument.getName().equals(argumentName) && argument
+                                            .getDirection().equals("out")).findFirst().orElseThrow(
+                                            () -> new ChannelConfigException(
+                                                    "Get-Argument '" + argumentName + "' not found"));
                             SCPDStateVariableType relatedStateVariable = serviceRoot.getServiceStateTable().stream()
                                     .filter(stateVariable -> stateVariable.getName()
-                                            .equals(scpdArgument.getRelatedStateVariable()))
-                                    .findFirst().orElseThrow(() -> new ChannelConfigException("StateVariable '"
-                                            + scpdArgument.getRelatedStateVariable() + "' not found"));
-                            parameters.addAll(
-                                    getAndCheckParameters(channelId, getAction, scpdAction, serviceRoot, thingConfig));
+                                            .equals(scpdArgument.getRelatedStateVariable())).findFirst().orElseThrow(
+                                            () -> new ChannelConfigException("StateVariable '" + scpdArgument
+                                                    .getRelatedStateVariable() + "' not found"));
+                            parameters.addAll(getAndCheckParameters(channelId, getAction, scpdAction, serviceRoot,
+                                    thingConfig));
 
                             channelConfig.setGetAction(scpdAction);
                             channelConfig.setDataType(relatedStateVariable.getDataType());
@@ -135,20 +132,20 @@ public class Util {
                             String argumentName = setAction.getArgument();
 
                             SCPDActionType scpdAction = serviceRoot.getActionList().stream()
-                                    .filter(action -> action.getName().equals(actionName)).findFirst()
-                                    .orElseThrow(() -> new ChannelConfigException(
-                                            "Set-Action '" + actionName + "' not found"));
+                                    .filter(action -> action.getName().equals(actionName)).findFirst().orElseThrow(
+                                            () -> new ChannelConfigException(
+                                                    "Set-Action '" + actionName + "' not found"));
                             if (argumentName != null) {
                                 SCPDArgumentType scpdArgument = scpdAction.getArgumentList().stream()
-                                        .filter(argument -> argument.getName().equals(argumentName)
-                                                && argument.getDirection().equals("in"))
-                                        .findFirst().orElseThrow(() -> new ChannelConfigException(
-                                                "Set-Argument '" + argumentName + "' not found"));
+                                        .filter(argument -> argument.getName().equals(argumentName) && argument
+                                                .getDirection().equals("in")).findFirst().orElseThrow(
+                                                () -> new ChannelConfigException(
+                                                        "Set-Argument '" + argumentName + "' not found"));
                                 SCPDStateVariableType relatedStateVariable = serviceRoot.getServiceStateTable().stream()
                                         .filter(stateVariable -> stateVariable.getName()
-                                                .equals(scpdArgument.getRelatedStateVariable()))
-                                        .findFirst().orElseThrow(() -> new ChannelConfigException("StateVariable '"
-                                                + scpdArgument.getRelatedStateVariable() + "' not found"));
+                                                .equals(scpdArgument.getRelatedStateVariable())).findFirst()
+                                        .orElseThrow(() -> new ChannelConfigException("StateVariable '" + scpdArgument
+                                                .getRelatedStateVariable() + "' not found"));
                                 if (channelConfig.getDataType().isEmpty()) {
                                     channelConfig.setDataType(relatedStateVariable.getDataType());
                                 } else if (!channelConfig.getDataType().equals(relatedStateVariable.getDataType())) {
@@ -161,11 +158,15 @@ public class Util {
                         if (parameters.isEmpty()) {
                             // we have no parameters, so create a single channel
                             ChannelUID channelUID = new ChannelUID(thing.getUID(), channelId);
-                            Channel channel = ChannelBuilder.create(channelUID, channelType.getItem().getType())
-                                    .withLabel(channelType.getLabel()).build();
+                            ChannelBuilder channelBuilder = ChannelBuilder
+                                    .create(channelUID, channelType.getItem().getType())
+                                    .withLabel(channelType.getLabel());
+                            if (channelType.getDescription() != null) {
+                                channelBuilder.withDescription(channelType.getDescription());
+                            }
                             createStateDescription(dynamicStateDescriptionProvider, channelUID, setAction == null,
                                     channelType.getItem().getStatePattern());
-                            thingBuilder.withChannel(channel);
+                            thingBuilder.withChannel(channelBuilder.build());
                             channels.put(channelUID, channelConfig);
                         } else {
                             // create a channel for each parameter
@@ -173,11 +174,15 @@ public class Util {
                                 String normalizedParameter = UIDUtils.encode(parameter);
                                 ChannelUID channelUID = new ChannelUID(thing.getUID(),
                                         channelId + "_" + normalizedParameter);
-                                Channel channel = ChannelBuilder.create(channelUID, channelType.getItem().getType())
-                                        .withLabel(channelType.getLabel() + " " + parameter).build();
+                                ChannelBuilder channelBuilder = ChannelBuilder
+                                        .create(channelUID, channelType.getItem().getType())
+                                        .withLabel(channelType.getLabel() + " " + parameter);
+                                if (channelType.getDescription() != null) {
+                                    channelBuilder.withDescription(channelType.getDescription());
+                                }
                                 createStateDescription(dynamicStateDescriptionProvider, channelUID, setAction == null,
                                         channelType.getItem().getStatePattern());
-                                thingBuilder.withChannel(channel);
+                                thingBuilder.withChannel(channelBuilder.build());
                                 Tr064ChannelConfig channelConfig1 = new Tr064ChannelConfig(channelConfig);
                                 channelConfig1.setParameter(parameter);
                                 channels.put(channelUID, channelConfig1);
@@ -235,9 +240,8 @@ public class Util {
             // validate parameter against SCPD (if not internal only)
             if (!parameter.isInternalOnly()) {
                 SCPDArgumentType scpdArgument = scpdAction.getArgumentList().stream()
-                        .filter(argument -> argument.getName().equals(parameter.getName())
-                                && argument.getDirection().equals("in"))
-                        .findFirst().orElseThrow(() -> new ChannelConfigException(
+                        .filter(argument -> argument.getName().equals(parameter.getName()) && argument.getDirection()
+                                .equals("in")).findFirst().orElseThrow(() -> new ChannelConfigException(
                                 "Get-Parameter '" + parameter.getName() + "' not found"));
                 SCPDStateVariableType relatedStateVariable = serviceRoot.getServiceStateTable().stream()
                         .filter(stateVariable -> stateVariable.getName().equals(scpdArgument.getRelatedStateVariable()))
@@ -259,8 +263,8 @@ public class Util {
             }
             return parameters;
         } catch (NoSuchFieldException | IllegalAccessException | IllegalArgumentException e) {
-            throw new ChannelConfigException("Could not get required parameter '" + channelId
-                    + "' from thing config (missing, empty or invalid)");
+            throw new ChannelConfigException(
+                    "Could not get required parameter '" + channelId + "' from thing config (missing, empty or invalid)");
         }
     }
 
