@@ -25,7 +25,7 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 @NonNullByDefault
 public class Tr064RootConfiguration extends Tr064BaseThingConfiguration {
     public String host = "fritz.box";
-    public String user = "";
+    public String user = "dslf-config";
     public String password = "";
     public List<String> tamIndices = Collections.emptyList();
     public List<String> callDeflectionIndices = Collections.emptyList();
