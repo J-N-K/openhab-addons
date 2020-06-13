@@ -45,11 +45,11 @@
 				<description>List of days for which rejected calls should be calculated.</description>
 			</parameter>
 			<parameter name="inboundCallDays" type="text" multiple="true">
-				<label>Missed Call Days</label>
+				<label>Inbound Call Days</label>
 				<description>List of days for which inbound calls should be calculated.</description>
 			</parameter>
 			<parameter name="outboundCallDays" type="text" multiple="true">
-				<label>Missed Call Days</label>
+				<label>Outbound Call Days</label>
 				<description>List of days for which outbound calls should be calculated.</description>
 			</parameter>
 

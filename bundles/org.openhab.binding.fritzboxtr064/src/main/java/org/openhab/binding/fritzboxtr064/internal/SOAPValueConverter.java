@@ -245,7 +245,8 @@ public class SOAPValueConverter {
 
             return new DecimalType(callCount);
         } catch (InterruptedException | TimeoutException | ExecutionException e) {
-            throw new PostProcessingException("Failed to get Call list from URL " + state.toString());
+            logger.trace("Received {}:", e.getClass(), e);
+            throw new PostProcessingException("Failed to get call list from URL " + state.toString());
         }
     }
 }
