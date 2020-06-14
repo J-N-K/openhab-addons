@@ -239,7 +239,7 @@ public class SOAPValueConverter {
     private State processCallList(State state, @Nullable String days, String type) throws PostProcessingException {
         try {
             ContentResponse response = httpClient.newRequest(state.toString() + "&days=" + days)
-                    .timeout(1000, TimeUnit.MILLISECONDS).send();
+                    .timeout(5000, TimeUnit.MILLISECONDS).send();
             String responseContent = response.getContentAsString();
             int callCount = responseContent.split("<Type>" + type + "</Type>").length - 1;
 
