@@ -93,14 +93,15 @@ public class SOAPValueConverter {
                 return Optional.of(command.toString());
             }
         } else if (command instanceof OnOffType) {
-            if (dataType.equals("boolean"))
+            if (dataType.equals("boolean")) {
                 return Optional.of(OnOffType.ON.equals(command) ? "1" : "0");
+            }
         }
         return Optional.empty();
     }
 
     /**
-     * convert the value from a SOAP message to a openHAB value
+     * convert the value from a SOAP message to an openHAB value
      *
      * @param soapMessage the inbound SSOAP message
      * @param element the element that needs to be extracted
@@ -108,7 +109,6 @@ public class SOAPValueConverter {
      *            missing unit is assumed)
      * @return an Optional of State containing the converted value
      */
-    @SuppressWarnings("null")
     public Optional<State> getStateFromSOAPValue(SOAPMessage soapMessage, String element,
             @Nullable Tr064ChannelConfig channelConfig) {
         String dataType = channelConfig != null ? channelConfig.getDataType() : "string";
@@ -129,7 +129,7 @@ public class SOAPValueConverter {
                         return new DecimalType(rawValue);
                     }
                 default:
-                    return null;
+                    throw new IllegalStateException("Unrecognized data type: " + dataType);
             }
         }).map(state -> {
             // check if we need post processing

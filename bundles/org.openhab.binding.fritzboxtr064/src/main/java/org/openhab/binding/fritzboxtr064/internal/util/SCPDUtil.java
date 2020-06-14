@@ -14,7 +14,11 @@ package org.openhab.binding.fritzboxtr064.internal.util;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -53,9 +57,8 @@ public class SCPDUtil {
 
     private SCPDRootType scpdRoot;
     private final List<SCPDDeviceType> scpdDevicesList = new ArrayList<>();
-    private final Map<String, SCPDScpdType> serviceMap = new HashMap<>();
+    private final Map<String, @Nullable SCPDScpdType> serviceMap = new HashMap<>();
 
-    @SuppressWarnings("null")
     public SCPDUtil(HttpClient httpClient, String endpoint) throws SCPDException {
         this.httpClient = httpClient;
 
@@ -141,7 +144,7 @@ public class SCPDUtil {
      * @param serviceId the service id
      * @return the service
      */
-    public Optional<SCPDScpdType> getService(String serviceId) {
+    public Optional<@Nullable SCPDScpdType> getService(String serviceId) {
         return Optional.ofNullable(serviceMap.get(serviceId));
     }
 }
