@@ -57,15 +57,7 @@ import org.snmp4j.Snmp;
 import org.snmp4j.event.ResponseEvent;
 import org.snmp4j.event.ResponseListener;
 import org.snmp4j.mp.SnmpConstants;
-import org.snmp4j.smi.Counter64;
-import org.snmp4j.smi.Integer32;
-import org.snmp4j.smi.IpAddress;
-import org.snmp4j.smi.OID;
-import org.snmp4j.smi.OctetString;
-import org.snmp4j.smi.UdpAddress;
-import org.snmp4j.smi.UnsignedInteger32;
-import org.snmp4j.smi.Variable;
-import org.snmp4j.smi.VariableBinding;
+import org.snmp4j.smi.*;
 
 /**
  * The {@link SnmpTargetHandler} is responsible for handling commands, which are
@@ -342,7 +334,28 @@ public class SnmpTargetHandler extends BaseThingHandler implements ResponseListe
                 } else if (CHANNEL_TYPE_UID_NUMBER.equals(channel.getChannelTypeUID())) {
                     try {
                         if (channelConfig.datatype == SnmpDatatype.FLOAT) {
-                            state = new DecimalType(value.toString());
+                            if (value instanceof Opaque) {
+                                Opaque o = (Opaque) value;
+                                byte[] octets = o.toByteArray();
+                                if (octets.length < 3) {
+                                    // two bytes identifier and one byte length should always be present
+                                    throw new UnsupportedOperationException("Not enough octets");
+                                }
+                                if (octets.length != (3 + octets[2])) {
+                                    // octet 3 contains the lengths of the value
+                                    throw new UnsupportedOperationException("Not enough octets");
+                                }
+                                if (octets[0] == (byte) 0x9f && octets[1] == 0x78 && octets[2] == 0x04) {
+                                    // floating point value
+                                    state = new DecimalType(Float.intBitsToFloat(
+                                            octets[3] << 24 | octets[4] << 16 | octets[5] << 8 | octets[6]));
+                                } else {
+                                    throw new UnsupportedOperationException(
+                                            "Unknown opaque datatype" + value.toString());
+                                }
+                            } else {
+                                state = new DecimalType(value.toString());
+                            }
                         } else {
                             state = new DecimalType(value.toLong());
                         }
