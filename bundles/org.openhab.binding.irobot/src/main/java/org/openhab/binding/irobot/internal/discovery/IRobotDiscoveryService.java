@@ -34,6 +34,7 @@ import org.openhab.core.config.discovery.DiscoveryResult;
 import org.openhab.core.config.discovery.DiscoveryResultBuilder;
 import org.openhab.core.config.discovery.DiscoveryService;
 import org.openhab.core.net.NetUtil;
+import org.openhab.core.thing.Thing;
 import org.openhab.core.thing.ThingUID;
 import org.osgi.service.component.annotations.Component;
 import org.slf4j.Logger;
@@ -155,9 +156,11 @@ public class IRobotDiscoveryService extends AbstractDiscoveryService {
         }
 
         if (ident.product.equals(IdentData.PRODUCT_ROOMBA)) {
-            ThingUID thingUID = new ThingUID(IRobotBindingConstants.THING_TYPE_ROOMBA, host.replace('.', '_'));
-            DiscoveryResult result = DiscoveryResultBuilder.create(thingUID).withProperty("ipaddress", host)
-                    .withRepresentationProperty("ipaddress").withLabel("iRobot " + ident.robotname).build();
+            ThingUID thingUID = new ThingUID(IRobotBindingConstants.THING_TYPE_ROOMBA, ident.blid);
+            DiscoveryResult result = DiscoveryResultBuilder.create(thingUID)
+                    .withProperty(Thing.PROPERTY_MAC_ADDRESS, ident.mac)
+                    .withRepresentationProperty(Thing.PROPERTY_MAC_ADDRESS).withLabel("iRobot " + ident.robotname)
+                    .build();
 
             thingDiscovered(result);
         }
