@@ -29,6 +29,7 @@ import org.openhab.binding.melcloud.internal.handler.MelCloudAccountHandler;
 import org.openhab.core.config.discovery.AbstractDiscoveryService;
 import org.openhab.core.config.discovery.DiscoveryResultBuilder;
 import org.openhab.core.config.discovery.DiscoveryService;
+import org.openhab.core.thing.Thing;
 import org.openhab.core.thing.ThingTypeUID;
 import org.openhab.core.thing.ThingUID;
 import org.openhab.core.thing.binding.ThingHandler;
@@ -49,6 +50,10 @@ public class MelCloudDiscoveryService extends AbstractDiscoveryService
     private final Logger logger = LoggerFactory.getLogger(MelCloudDiscoveryService.class);
 
     private static final int DISCOVER_TIMEOUT_SECONDS = 10;
+
+    private static final String PROPERTY_DEVICE_ID = "deviceID";
+    private static final String PROPERTY_DEVICE_NAME = "deviceName";
+    private static final String PROPERTY_BUILDING_ID = "buildingID";
 
     private MelCloudAccountHandler melCloudHandler;
     private ScheduledFuture<?> scanTask;
@@ -86,7 +91,7 @@ public class MelCloudDiscoveryService extends AbstractDiscoveryService
         if (this.scanTask != null) {
             scanTask.cancel(true);
         }
-        this.scanTask = scheduler.schedule(() -> discoverDevices(), 0, TimeUnit.SECONDS);
+        this.scanTask = scheduler.schedule(this::discoverDevices, 0, TimeUnit.SECONDS);
     }
 
     @Override
@@ -126,19 +131,18 @@ public class MelCloudDiscoveryService extends AbstractDiscoveryService
                                 device.getDeviceID().toString());
 
                         Map<String, Object> deviceProperties = new HashMap<>();
-                        deviceProperties.put("deviceID", device.getDeviceID().toString());
-                        deviceProperties.put("serialNumber", device.getSerialNumber().toString());
-                        deviceProperties.put("macAddress", device.getMacAddress().toString());
-                        deviceProperties.put("deviceName", device.getDeviceName().toString());
-                        deviceProperties.put("buildingID", device.getBuildingID().toString());
+                        deviceProperties.put(PROPERTY_DEVICE_ID, device.getDeviceID().toString());
+                        deviceProperties.put(Thing.PROPERTY_SERIAL_NUMBER, device.getSerialNumber());
+                        deviceProperties.put(Thing.PROPERTY_MAC_ADDRESS, device.getMacAddress());
+                        deviceProperties.put(PROPERTY_DEVICE_NAME, device.getDeviceName());
+                        deviceProperties.put(PROPERTY_BUILDING_ID, device.getBuildingID().toString());
 
                         String label = createLabel(device);
                         logger.debug("Found device: {} : {}", label, deviceProperties);
 
                         thingDiscovered(DiscoveryResultBuilder.create(deviceThing).withLabel(label)
-                                .withProperties(deviceProperties)
-                                .withRepresentationProperty(device.getDeviceID().toString()).withBridge(bridgeUID)
-                                .build());
+                                .withProperties(deviceProperties).withRepresentationProperty(PROPERTY_DEVICE_ID)
+                                .withBridge(bridgeUID).build());
                     });
                 }
             } catch (MelCloudLoginException e) {
