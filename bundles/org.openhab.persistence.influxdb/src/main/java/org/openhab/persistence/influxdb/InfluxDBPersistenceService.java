@@ -14,7 +14,6 @@ package org.openhab.persistence.influxdb;
 
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -92,6 +91,8 @@ public class InfluxDBPersistenceService implements QueryablePersistenceService {
     private @NonNullByDefault({}) ItemToStorePointCreator itemToStorePointCreator;
     private @NonNullByDefault({}) InfluxDBRepository influxDBRepository;
 
+    private boolean tryReconnection = false;
+
     @Activate
     public InfluxDBPersistenceService(final @Reference ItemRegistry itemRegistry,
             final @Reference MetadataRegistry metadataRegistry) {
@@ -110,8 +111,10 @@ public class InfluxDBPersistenceService implements QueryablePersistenceService {
             itemToStorePointCreator = new ItemToStorePointCreator(configuration, metadataRegistry);
             influxDBRepository = createInfluxDBRepository();
             influxDBRepository.connect();
+            tryReconnection = true;
         } else {
             logger.error("Cannot load configuration, persistence service wont work");
+            tryReconnection = false;
         }
 
         logger.debug("InfluxDB persistence service is now activated");
@@ -129,6 +132,7 @@ public class InfluxDBPersistenceService implements QueryablePersistenceService {
     public void deactivate() {
         logger.debug("InfluxDB persistence service deactivated");
         if (influxDBRepository != null) {
+            tryReconnection = false;
             influxDBRepository.disconnect();
             influxDBRepository = null;
         }
@@ -180,15 +184,33 @@ public class InfluxDBPersistenceService implements QueryablePersistenceService {
         return "InfluxDB persistence layer";
     }
 
+    /**
+     * check connection and try reconnect
+     *
+     * @return true if connected
+     */
+    private boolean checkConnection() {
+        if (influxDBRepository == null) {
+            return false;
+        } else if (influxDBRepository.isConnected()) {
+            return true;
+        } else if (tryReconnection) {
+            logger.debug("Connection lost, trying re-connection");
+            influxDBRepository.connect();
+            return influxDBRepository.isConnected();
+        }
+        return false;
+    }
+
     @Override
     public Set<PersistenceItemInfo> getItemInfo() {
-        if (influxDBRepository != null && influxDBRepository.isConnected()) {
+        if (checkConnection()) {
             return influxDBRepository.getStoredItemsCount().entrySet().stream()
                     .map(entry -> new InfluxDBPersistentItemInfo(entry.getKey(), entry.getValue()))
                     .collect(Collectors.toUnmodifiableSet());
         } else {
             logger.info("getItemInfo ignored, InfluxDB is not yet connected");
-            return Collections.emptySet();
+            return Set.of();
         }
     }
 
@@ -199,7 +221,7 @@ public class InfluxDBPersistenceService implements QueryablePersistenceService {
 
     @Override
     public void store(Item item, @Nullable String alias) {
-        if (influxDBRepository != null && influxDBRepository.isConnected()) {
+        if (checkConnection()) {
             InfluxPoint point = itemToStorePointCreator.convert(item, alias);
             if (point != null) {
                 logger.trace("Storing item {} in InfluxDB point {}", item, point);
@@ -216,7 +238,7 @@ public class InfluxDBPersistenceService implements QueryablePersistenceService {
     public Iterable<HistoricItem> query(FilterCriteria filter) {
         logger.debug("Got a query for historic points!");
 
-        if (influxDBRepository != null && influxDBRepository.isConnected()) {
+        if (checkConnection()) {
             logger.trace(
                     "Filter: itemname: {}, ordering: {}, state: {},  operator: {}, getBeginDate: {}, getEndDate: {}, getPageSize: {}, getPageNumber: {}",
                     filter.getItemName(), filter.getOrdering().toString(), filter.getState(), filter.getOperator(),
@@ -229,7 +251,7 @@ public class InfluxDBPersistenceService implements QueryablePersistenceService {
             return results.stream().map(this::mapRow2HistoricItem).collect(Collectors.toList());
         } else {
             logger.debug("query ignored, InfluxDB is not yet connected");
-            return Collections.emptyList();
+            return List.of();
         }
     }
 
