@@ -110,6 +110,7 @@ public class IdentProtocol {
         public int ver;
         private String hostname;
         public String robotname;
+        public String mac;
 
         // These two fields are synthetic, they are not contained in JSON
         public String product;
