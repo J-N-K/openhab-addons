@@ -53,6 +53,7 @@
 			<channel id="clean_passes" typeId="clean_passes"/>
 			<channel id="map_upload" typeId="map_upload"/>
 		</channels>
+		<representation-property>macAddress</representation-property>
 		<config-description>
 			<parameter name="ipaddress" type="text">
 				<label>IP Address</label>
@@ -61,8 +62,8 @@
 			</parameter>
 			<parameter name="password" type="text">
 				<label>Password</label>
+				<context>password</context>
 			</parameter>
-
 		</config-description>
 	</thing-type>
 
