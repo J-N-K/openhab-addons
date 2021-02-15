@@ -28,7 +28,7 @@ import org.openhab.binding.tr064.internal.dto.additions.Call;
  */
 @NonNullByDefault
 public class CallListEntry {
-    private static final SimpleDateFormat DATE_FORMAT_PARSER = new SimpleDateFormat("dd.MM.yy hh:mm");
+    private static final SimpleDateFormat DATE_FORMAT_PARSER = new SimpleDateFormat("dd.MM.yy HH:mm");
     public @Nullable String localNumber;
     public @Nullable String remoteNumber;
     public @Nullable Date date;
