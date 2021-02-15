@@ -12,6 +12,8 @@
  */
 package org.openhab.binding.deconz.internal.handler;
 
+import static org.openhab.binding.deconz.internal.BindingConstants.*;
+
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
@@ -20,17 +22,17 @@ import java.util.stream.Stream;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
+import org.openhab.binding.deconz.internal.Util;
 import org.openhab.binding.deconz.internal.dto.DeconzBaseMessage;
 import org.openhab.binding.deconz.internal.netutils.WebSocketConnection;
 import org.openhab.binding.deconz.internal.netutils.WebSocketMessageListener;
 import org.openhab.binding.deconz.internal.types.ResourceType;
-import org.openhab.core.thing.Bridge;
-import org.openhab.core.thing.ChannelUID;
-import org.openhab.core.thing.Thing;
-import org.openhab.core.thing.ThingStatus;
-import org.openhab.core.thing.ThingStatusDetail;
-import org.openhab.core.thing.ThingStatusInfo;
+import org.openhab.core.thing.*;
 import org.openhab.core.thing.binding.BaseThingHandler;
+import org.openhab.core.thing.binding.builder.ChannelBuilder;
+import org.openhab.core.thing.binding.builder.ThingBuilder;
+import org.openhab.core.thing.type.ChannelKind;
+import org.openhab.core.thing.type.ChannelTypeUID;
 import org.openhab.core.types.Command;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,7 +54,9 @@ public abstract class DeconzBaseThingHandler extends BaseThingHandler implements
     protected final ResourceType resourceType;
     protected ThingConfig config = new ThingConfig();
     protected final Gson gson;
+
     private @Nullable ScheduledFuture<?> initializationJob;
+    private @Nullable ScheduledFuture<?> lastSeenPollingJob;
     protected @Nullable WebSocketConnection connection;
 
     public DeconzBaseThingHandler(Thing thing, Gson gson, ResourceType resourceType) {
@@ -69,6 +73,17 @@ public abstract class DeconzBaseThingHandler extends BaseThingHandler implements
         if (future != null) {
             future.cancel(true);
             initializationJob = null;
+        }
+    }
+
+    /**
+     * Stops the API request
+     */
+    private void stopLastSeenPollingJob() {
+        ScheduledFuture<?> future = lastSeenPollingJob;
+        if (future != null) {
+            future.cancel(true);
+            lastSeenPollingJob = null;
         }
     }
 
@@ -159,6 +174,76 @@ public abstract class DeconzBaseThingHandler extends BaseThingHandler implements
     }
 
     /**
+     * create a channel on the current thing
+     *
+     * @param thingBuilder a ThingBuilder instance for this thing
+     * @param channelId the channel id
+     * @param kind the channel kind (STATE or TRIGGER)
+     * @return true if the thing was modified
+     */
+    protected boolean createChannel(ThingBuilder thingBuilder, String channelId, ChannelKind kind) {
+        if (thing.getChannel(channelId) != null) {
+            // channel already exists, no update necessary
+            return false;
+        }
+
+        ChannelUID channelUID = new ChannelUID(thing.getUID(), channelId);
+        ChannelTypeUID channelTypeUID;
+        switch (channelId) {
+            case CHANNEL_BATTERY_LEVEL:
+                channelTypeUID = new ChannelTypeUID("system:battery-level");
+                break;
+            case CHANNEL_BATTERY_LOW:
+                channelTypeUID = new ChannelTypeUID("system:low-battery");
+                break;
+            default:
+                channelTypeUID = new ChannelTypeUID(BINDING_ID, channelId);
+                break;
+        }
+
+        Channel channel = ChannelBuilder.create(channelUID).withType(channelTypeUID).withKind(kind).build();
+        thingBuilder.withChannel(channel);
+
+        return true;
+    }
+
+    /**
+     * check if we need to add a last seen channel (called from processStateResponse only)
+     *
+     * @param thingBuilder a ThingBuilder instance for this thing
+     * @param lastSeen the lastSeen string of a deconz message
+     * @return true if the thing was modified
+     */
+    protected boolean checkLastSeen(ThingBuilder thingBuilder, @Nullable String lastSeen) {
+        // "Last seen" is the last "ping" from the device, whereas "last update" is the last status changed.
+        // For example, for a fire sensor, the device pings regularly, without necessarily updating channels.
+        // So to monitor a sensor is still alive, the "last seen" is necessary.
+        // Because "last seen" is never updated by the WebSocket API we have to
+        // manually poll it after the defined time if supported by the device
+        boolean thingEdited = false;
+        if (lastSeen != null && config.lastSeenPolling > 0) {
+            thingEdited = createChannel(thingBuilder, CHANNEL_LAST_SEEN, ChannelKind.STATE);
+            updateState(CHANNEL_LAST_SEEN, Util.convertTimestampToDateTime(lastSeen));
+            lastSeenPollingJob = scheduler.schedule(() -> requestState(this::processLastSeen), config.lastSeenPolling,
+                    TimeUnit.MINUTES);
+            logger.trace("lastSeen polling enabled for thing {} with interval of {} minutes", thing.getUID(),
+                    config.lastSeenPolling);
+        } else if (thing.getChannel(CHANNEL_LAST_SEEN) != null) {
+            thingBuilder.withoutChannel(new ChannelUID(thing.getUID(), CHANNEL_LAST_SEEN));
+            thingEdited = true;
+        }
+
+        return thingEdited;
+    }
+
+    private void processLastSeen(DeconzBaseMessage stateResponse) {
+        String lastSeen = stateResponse.lastseen;
+        if (lastSeen != null) {
+            updateState(CHANNEL_LAST_SEEN, Util.convertTimestampToDateTime(lastSeen));
+        }
+    }
+
+    /**
      * sends a command to the bridge with the default command URL
      *
      * @param object must be serializable and contain the command
@@ -209,6 +294,7 @@ public abstract class DeconzBaseThingHandler extends BaseThingHandler implements
     @Override
     public void dispose() {
         stopInitializationJob();
+        stopLastSeenPollingJob();
         unregisterListener();
         super.dispose();
     }

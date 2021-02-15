@@ -167,7 +167,9 @@ public class SensorThermostatThingHandler extends SensorBaseThingHandler {
     }
 
     @Override
-    protected void createTypeSpecificChannels(SensorConfig sensorConfig, SensorState sensorState) {
+    protected boolean createTypeSpecificChannels(ThingBuilder thingBuilder, SensorConfig sensorConfig,
+            SensorState sensorState) {
+        return false;
     }
 
     @Override

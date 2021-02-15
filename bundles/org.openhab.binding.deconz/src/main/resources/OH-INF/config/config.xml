@@ -34,6 +34,13 @@
 		</parameter>
 	</config-description>
 
+	<config-description uri="thing-type:deconz:group">
+		<parameter name="id" type="text" required="true">
+			<label>Device ID</label>
+			<description>The deCONZ bridge assigns an integer number ID to each group.</description>
+		</parameter>
+	</config-description>
+
 	<config-description uri="thing-type:deconz:sensor">
 		<parameter name="id" type="text" required="true">
 			<label>Device ID</label>
@@ -56,6 +63,12 @@
 			<label>Transition Time</label>
 			<description>Time to move between two states. If empty, the default of the device is used. Resolution is 1/10 second.</description>
 		</parameter>
+		<parameter name="lastSeenPolling" type="integer" min="0" unit="min">
+			<label>LastSeen Poll Interval</label>
+			<description>Interval to poll the deCONZ Gateway for this light's "last_seen" channel. Polling is disabled when set
+				to 0 (default: 1440, once per day).</description>
+			<default>1440</default>
+		</parameter>
 	</config-description>
 
 	<config-description uri="thing-type:deconz:colorlight">
@@ -75,6 +88,12 @@
 				<option value="xy">XY</option>
 			</options>
 			<advanced>true</advanced>
+		</parameter>
+		<parameter name="lastSeenPolling" type="integer" min="0" unit="min">
+			<label>LastSeen Poll Interval</label>
+			<description>Interval to poll the deCONZ Gateway for this light's "last_seen" channel. Polling is disabled when set
+				to 0 (default: 1440, once per day).</description>
+			<default>1440</default>
 		</parameter>
 	</config-description>
 
