@@ -17,8 +17,6 @@ import static org.openhab.binding.deconz.internal.BindingConstants.*;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
 
 import javax.measure.Unit;
 
@@ -38,9 +36,8 @@ import org.openhab.core.thing.ChannelUID;
 import org.openhab.core.thing.Thing;
 import org.openhab.core.thing.ThingStatus;
 import org.openhab.core.thing.ThingStatusDetail;
-import org.openhab.core.thing.binding.ThingHandlerCallback;
+import org.openhab.core.thing.binding.builder.ThingBuilder;
 import org.openhab.core.thing.type.ChannelKind;
-import org.openhab.core.thing.type.ChannelTypeUID;
 import org.openhab.core.types.Command;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,27 +71,16 @@ public abstract class SensorBaseThingHandler extends DeconzBaseThingHandler {
      * Prevent a dispose/init cycle while this flag is set. Use for property updates
      */
     private boolean ignoreConfigurationUpdate;
-    private @Nullable ScheduledFuture<?> lastSeenPollingJob;
 
     public SensorBaseThingHandler(Thing thing, Gson gson) {
         super(thing, gson, ResourceType.SENSORS);
     }
 
     @Override
-    public void dispose() {
-        ScheduledFuture<?> lastSeenPollingJob = this.lastSeenPollingJob;
-        if (lastSeenPollingJob != null) {
-            lastSeenPollingJob.cancel(true);
-            this.lastSeenPollingJob = null;
-        }
-
-        super.dispose();
-    }
-
-    @Override
     public abstract void handleCommand(ChannelUID channelUID, Command command);
 
-    protected abstract void createTypeSpecificChannels(SensorConfig sensorState, SensorState sensorConfig);
+    protected abstract boolean createTypeSpecificChannels(ThingBuilder thingBuilder, SensorConfig sensorState,
+            SensorState sensorConfig);
 
     protected abstract List<String> getConfigChannels();
 
@@ -134,68 +120,30 @@ public abstract class SensorBaseThingHandler extends DeconzBaseThingHandler {
         // Some sensors support optional channels
         // (see https://github.com/dresden-elektronik/deconz-rest-plugin/wiki/Supported-Devices#sensors)
         // any battery-powered sensor
+        ThingBuilder thingBuilder = editThing();
+        boolean thingEdited = false;
+
         if (sensorConfig.battery != null) {
-            createChannel(CHANNEL_BATTERY_LEVEL, ChannelKind.STATE);
-            createChannel(CHANNEL_BATTERY_LOW, ChannelKind.STATE);
+            thingEdited = thingEdited || createChannel(thingBuilder, CHANNEL_BATTERY_LEVEL, ChannelKind.STATE);
+            thingEdited = thingEdited || createChannel(thingBuilder, CHANNEL_BATTERY_LOW, ChannelKind.STATE);
         }
 
-        createTypeSpecificChannels(sensorConfig, sensorState);
+        thingEdited = thingEdited || createTypeSpecificChannels(thingBuilder, sensorConfig, sensorState);
 
-        ignoreConfigurationUpdate = false;
-
-        // "Last seen" is the last "ping" from the device, whereas "last update" is the last status changed.
-        // For example, for a fire sensor, the device pings regularly, without necessarily updating channels.
-        // So to monitor a sensor is still alive, the "last seen" is necessary.
-        // Because "last seen" is never updated by the WebSocket API - if this is supported, then we have to
-        // manually poll it after the defined time
         String lastSeen = sensorMessage.lastseen;
-        if (lastSeen != null && config.lastSeenPolling > 0) {
-            createChannel(CHANNEL_LAST_SEEN, ChannelKind.STATE);
-            updateState(CHANNEL_LAST_SEEN, Util.convertTimestampToDateTime(lastSeen));
-            lastSeenPollingJob = scheduler.schedule(() -> requestState(this::processLastSeen), config.lastSeenPolling,
-                    TimeUnit.MINUTES);
-            logger.trace("lastSeen polling enabled for thing {} with interval of {} minutes", thing.getUID(),
-                    config.lastSeenPolling);
+        thingEdited = thingEdited || checkLastSeen(thingBuilder, lastSeen);
+
+        // if the thing was edited, we update it now
+        if (thingEdited) {
+            updateThing(thingBuilder.build());
         }
+        ignoreConfigurationUpdate = false;
 
         // Initial data
         updateChannels(sensorConfig);
         updateChannels(sensorState, true);
 
         updateStatus(ThingStatus.ONLINE);
-    }
-
-    private void processLastSeen(DeconzBaseMessage stateResponse) {
-        String lastSeen = stateResponse.lastseen;
-        if (lastSeen != null) {
-            updateState(CHANNEL_LAST_SEEN, Util.convertTimestampToDateTime(lastSeen));
-        }
-    }
-
-    protected void createChannel(String channelId, ChannelKind kind) {
-        if (thing.getChannel(channelId) != null) {
-            // channel already exists, no update necessary
-            return;
-        }
-
-        ThingHandlerCallback callback = getCallback();
-        if (callback != null) {
-            ChannelUID channelUID = new ChannelUID(thing.getUID(), channelId);
-            ChannelTypeUID channelTypeUID;
-            switch (channelId) {
-                case CHANNEL_BATTERY_LEVEL:
-                    channelTypeUID = new ChannelTypeUID("system:battery-level");
-                    break;
-                case CHANNEL_BATTERY_LOW:
-                    channelTypeUID = new ChannelTypeUID("system:low-battery");
-                    break;
-                default:
-                    channelTypeUID = new ChannelTypeUID(BINDING_ID, channelId);
-                    break;
-            }
-            Channel channel = callback.createChannelBuilder(channelUID, channelTypeUID).withKind(kind).build();
-            updateThing(editThing().withChannel(channel).build());
-        }
     }
 
     /**

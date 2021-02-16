@@ -304,9 +304,19 @@ public class LightThingHandler extends DeconzBaseThingHandler {
             }
         }
 
+        ThingBuilder thingBuilder = editThing();
+        boolean thingEdited = false;
+
         LightState lightState = lightMessage.state;
         if (lightState != null && lightState.effect != null) {
-            checkAndUpdateEffectChannels(lightMessage);
+            thingEdited = thingEdited || checkAndUpdateEffectChannels(thingBuilder, lightMessage);
+        }
+
+        String lastSeen = stateResponse.lastseen;
+        thingEdited = thingEdited || checkLastSeen(thingBuilder, lastSeen);
+
+        if (thingEdited) {
+            updateThing(thingBuilder.build());
         }
 
         messageReceived(config.id, lightMessage);
@@ -318,8 +328,9 @@ public class LightThingHandler extends DeconzBaseThingHandler {
         UNKNOWN;
     }
 
-    private void checkAndUpdateEffectChannels(LightMessage lightMessage) {
+    private boolean checkAndUpdateEffectChannels(ThingBuilder thingBuilder, LightMessage lightMessage) {
         EffectLightModel model = EffectLightModel.UNKNOWN;
+        boolean thingEdited = false;
         // try to determine which model we have
         if (lightMessage.manufacturername.equals("_TZE200_s8gkrkxk")) {
             // the LIDL Melinara string does not report a proper model name
@@ -336,15 +347,13 @@ public class LightThingHandler extends DeconzBaseThingHandler {
         ChannelUID effectSpeedChannelUID = new ChannelUID(thing.getUID(), CHANNEL_EFFECT_SPEED);
 
         if (thing.getChannel(CHANNEL_EFFECT) == null) {
-            ThingBuilder thingBuilder = editThing();
-            thingBuilder.withChannel(
-                    ChannelBuilder.create(effectChannelUID, "String").withType(CHANNEL_EFFECT_TYPE_UID).build());
+            thingBuilder.withChannel(ChannelBuilder.create(effectChannelUID).withType(CHANNEL_EFFECT_TYPE_UID).build());
             if (model == EffectLightModel.LIDL_MELINARA) {
                 // additional channels
                 thingBuilder.withChannel(ChannelBuilder.create(effectSpeedChannelUID, "Number")
                         .withType(CHANNEL_EFFECT_SPEED_TYPE_UID).build());
             }
-            updateThing(thingBuilder.build());
+            thingEdited = true;
         }
 
         switch (model) {
@@ -367,6 +376,8 @@ public class LightThingHandler extends DeconzBaseThingHandler {
                         CommandDescriptionBuilder.create().withCommandOptions(toCommandOptionList(options)).build());
 
         }
+
+        return thingEdited;
     }
 
     private List<CommandOption> toCommandOptionList(List<String> options) {

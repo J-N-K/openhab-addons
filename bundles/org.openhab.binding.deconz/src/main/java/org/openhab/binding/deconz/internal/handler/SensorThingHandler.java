@@ -33,6 +33,7 @@ import org.openhab.core.library.types.StringType;
 import org.openhab.core.thing.ChannelUID;
 import org.openhab.core.thing.Thing;
 import org.openhab.core.thing.ThingTypeUID;
+import org.openhab.core.thing.binding.builder.ThingBuilder;
 import org.openhab.core.thing.type.ChannelKind;
 import org.openhab.core.types.Command;
 import org.openhab.core.types.RefreshType;
@@ -218,40 +219,45 @@ public class SensorThingHandler extends SensorBaseThingHandler {
     }
 
     @Override
-    protected void createTypeSpecificChannels(SensorConfig sensorConfig, SensorState sensorState) {
+    protected boolean createTypeSpecificChannels(ThingBuilder thingBuilder, SensorConfig sensorConfig,
+            SensorState sensorState) {
+        boolean thingEdited = false;
+
         // some Xiaomi sensors
         if (sensorConfig.temperature != null) {
-            createChannel(CHANNEL_TEMPERATURE, ChannelKind.STATE);
+            thingEdited = thingEdited || createChannel(thingBuilder, CHANNEL_TEMPERATURE, ChannelKind.STATE);
         }
 
         // ZHAPresence - e.g. IKEA TRÅDFRI motion sensor
         if (sensorState.dark != null) {
-            createChannel(CHANNEL_DARK, ChannelKind.STATE);
+            thingEdited = thingEdited || createChannel(thingBuilder, CHANNEL_DARK, ChannelKind.STATE);
         }
 
         // ZHAConsumption - e.g Bitron 902010/25 or Heiman SmartPlug
         if (sensorState.power != null) {
-            createChannel(CHANNEL_POWER, ChannelKind.STATE);
+            thingEdited = thingEdited || createChannel(thingBuilder, CHANNEL_POWER, ChannelKind.STATE);
         }
 
         // ZHAPower - e.g. Heiman SmartPlug
         if (sensorState.voltage != null) {
-            createChannel(CHANNEL_VOLTAGE, ChannelKind.STATE);
+            thingEdited = thingEdited || createChannel(thingBuilder, CHANNEL_VOLTAGE, ChannelKind.STATE);
         }
         if (sensorState.current != null) {
-            createChannel(CHANNEL_CURRENT, ChannelKind.STATE);
+            thingEdited = thingEdited || createChannel(thingBuilder, CHANNEL_CURRENT, ChannelKind.STATE);
         }
 
         // IAS Zone sensor - e.g. Heiman HS1MS motion sensor
         if (sensorState.tampered != null) {
-            createChannel(CHANNEL_TAMPERED, ChannelKind.STATE);
+            thingEdited = thingEdited || createChannel(thingBuilder, CHANNEL_TAMPERED, ChannelKind.STATE);
         }
 
         // e.g. Aqara Cube
         if (sensorState.gesture != null) {
-            createChannel(CHANNEL_GESTURE, ChannelKind.STATE);
-            createChannel(CHANNEL_GESTUREEVENT, ChannelKind.TRIGGER);
+            thingEdited = thingEdited || createChannel(thingBuilder, CHANNEL_GESTURE, ChannelKind.STATE);
+            thingEdited = thingEdited || createChannel(thingBuilder, CHANNEL_GESTUREEVENT, ChannelKind.TRIGGER);
         }
+
+        return thingEdited;
     }
 
     @Override
