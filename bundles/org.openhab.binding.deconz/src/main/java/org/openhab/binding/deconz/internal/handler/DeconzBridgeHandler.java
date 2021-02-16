@@ -25,6 +25,7 @@ import java.util.concurrent.TimeoutException;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
+import org.eclipse.jetty.http.HttpMethod;
 import org.openhab.binding.deconz.internal.discovery.ThingDiscoveryService;
 import org.openhab.binding.deconz.internal.dto.ApiKeyMessage;
 import org.openhab.binding.deconz.internal.dto.BridgeFullState;
@@ -321,13 +322,23 @@ public class DeconzBridgeHandler extends BaseBridgeHandler implements WebSocketC
      *
      * @param endPoint the endpoint (e.g. "lights/2/state")
      * @param object the object (or null if no object)
+     * @param httpMethod the HTTP Method
      * @return CompletableFuture of the result
      */
-    public CompletableFuture<AsyncHttpClient.Result> sendObject(String endPoint, @Nullable Object object) {
+    public CompletableFuture<AsyncHttpClient.Result> sendObject(String endPoint, @Nullable Object object,
+            HttpMethod httpMethod) {
         String json = object == null ? null : gson.toJson(object);
         String url = buildUrl(config.host, config.httpPort, config.apikey, endPoint);
         logger.trace("Sending {} via {}", json, url);
 
-        return http.put(url, json, config.timeout);
+        if (httpMethod == HttpMethod.PUT) {
+            return http.put(url, json, config.timeout);
+        } else if (httpMethod == HttpMethod.POST) {
+            return http.post(url, json, config.timeout);
+        } else if (httpMethod == HttpMethod.DELETE) {
+            return http.delete(url, config.timeout);
+        }
+
+        return CompletableFuture.failedFuture(new IllegalArgumentException("Unknown HTTP Method"));
     }
 }

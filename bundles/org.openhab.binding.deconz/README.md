@@ -209,6 +209,16 @@ Both will be added during runtime if supported by the switch.
 | GESTURE_ROTATE_CLOCKWISE         | 7     |
 | GESTURE_ROTATE_COUNTER_CLOCKWISE | 8     |
 
+## Thing Actions
+
+The `lightgroup` thing supports thing actions for managing scenes:
+
+| Action name            | Return Value | Description |
+|------------------------|--------------|-------------|
+| `createScene(name)`    | `newSceneId` | creates a new scene with the name `name` and returns the new scene's id (if successfull) |
+| `deleteScene(id)`      | -            | deletes the scene with the given id |
+| `storeScene(id)`       | -            | store the current group's state as scene with the given id |
+
 ## Full Example
 
 ### Things file ###
@@ -253,6 +263,14 @@ when
 then
     ...
 end
+```
+
+### Thing Actions
+
+```js
+deconzActions = actions.get("deconz", "deconz:lightgroup:00212E040ED9:5");
+retVal = deconzActions.createScene("TestScene");
+deconzActions.storeScene(retVal["newSceneId"]);
 ```
 
 ### Troubleshooting
