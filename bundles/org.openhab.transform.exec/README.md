@@ -5,6 +5,10 @@ Transforms an input string with an external program.
 Executes an external program and returns the output as a string.
 In the given command line the placeholder `%s` is substituted with the input value.
 
+The provided command line is split on spaces before it is passed to the shell.
+Using single quotes (`'`) splitting can be avoided (e.g. `'%s'` would prevent splitting on spaces within the input value).
+The surrounding single quotes are removed.
+
 The external program must either be in the executable search path of the server process, or an absolute path has to be used.
 
 For security reasons all commands need to be whitelisted.
